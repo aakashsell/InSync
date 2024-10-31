@@ -1,28 +1,83 @@
+# Aakash Sell (asell)
+
+
 import time
 
-tempo = 60 #bpm
-second_per_beat = 60/tempo
-
-start_time = time.time()
-
-# Get sheet music data
-sheet_music = ['d1/4', 'e1/4', 'e1/2', 'e1/4', 'e1/4', 'e1/4']
-
-#transform sheet music into time series data.
-
-sheet_music = ['d', 'e', 'e', 'e', 'e', 'e', 'e']
+from fastdtw import fastdtw
+from scipy.spatial.distance import euclidean
+import numpy as np
 
 
-# Get Audio Data
 
-audio_data1 = [(0, 'd'), (1, 'e'), (2, 'e'), (4, 'e'), (5, 'e'), (6, 'e')]
-audio_data2 = [(0, 'd'), (2, 'e'), (2, 'e'), (4, 'e'), (5, 'e'), (6, 'e')]
+from parse_musicxml import *
+from file_conversions import *
+from processing import *
 
-# compare data
+import partitura as pt
 
-def compare(sheet, audio1, audio2):
-    #check where the data is in the music
+from music21 import converter, note
+
+
+
+# get sheetmusic
+
+
+
+
+# Example usage
+file_path = "./music.xml"
+
+
+def main():
+    pass
+
+    parts_data, time_signature = parse_musicxml_file(file_path)
+
+    singer_sm = parts_data['P1']
+
+    piano_sm = parts_data['P2']
+
     
+    singer_delayed = create_delayed(file_path)['P1']
+    piano_delayed = create_delayed(file_path)['P2']
+
+    s_real = [(note.Note(val[0]).pitch.midi, val[1], val[2]) for val in singer_sm]
+    s_delay = [(note.Note(val[0]).pitch.midi, val[1], val[2]) for val in singer_delayed]
+
+    p_real = [(note.Note(val[0]).pitch.midi, val[1], val[2]) for val in piano_sm]
+    p_delay = [(note.Note(val[0]).pitch.midi, val[1], val[2]) for val in singer_sm]
+
+    create_musicxml_from_parts({'P1': singer_sm}, time_signature)
+
+    print(singer_sm)
+
+
+    
+    distance, path = fastdtw(s_real, s_delay)
+
+
+
+
+    for val in path:
+       print(str(singer_sm[val[0]]) + " " + str(singer_delayed[val[1]]))
+
+
+
+
+
+if __name__ == "__main__":
+    main()
+
+
+
+
+
+
+
+
+
+
+
 
 
 
