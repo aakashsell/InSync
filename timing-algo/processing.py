@@ -1,60 +1,46 @@
 import numpy as np
 
+def note_distance(note1, note2, pitch_weight=1.0, onset_weight=1.0, duration_weight=1.0):
 
-def process(sequence_a, sequence_b):
+    pitch_diff = abs(note1[0] - note2[0])
+    onset_diff = abs(note1[1] - note2[1])
+    duration_diff = abs(note1[2] - note2[2])
+    
+    return pitch_weight * pitch_diff + onset_weight * onset_diff + duration_weight * duration_diff
 
 
-    # Define gap element and gap penalty
-    gap = (0, 0, 0)
-    gap_penalty = 1.0
+def process(array1, array2):
+    n, m = len(array1), len(array2)
+    cost = np.full((n + 1, m + 1), float('inf'))
+    cost[0, 0] = 0 
 
-    # Distance function (Euclidean distance for 3D points)
-    def euclidean_distance(point1, point2):
-        return np.sqrt(sum((x - y) ** 2 for x, y in zip(point1, point2)))
+    for i in range(1, n + 1):
+        for j in range(1, m + 1):
+            dist = note_distance(array1[i - 1], array2[j - 1], 0, 1, 2)
+            cost[i, j] = dist + min(cost[i - 1, j],    
+                                    cost[i, j - 1],    
+                                    cost[i - 1, j - 1])  
 
-    # Initialize ERP matrix
-    m, n = len(sequence_a), len(sequence_b)
-    erp_matrix = np.zeros((m + 1, n + 1))
+    dtw_distance = cost[n, m]
 
-    # Initialize first row and column with cumulative gap penalties
-    for i in range(1, m + 1):
-        erp_matrix[i][0] = erp_matrix[i - 1][0] + euclidean_distance(sequence_a[i - 1], gap)
-
-    for j in range(1, n + 1):
-        erp_matrix[0][j] = erp_matrix[0][j - 1] + euclidean_distance(gap, sequence_b[j - 1])
-
-    # Fill the ERP matrix
-    for i in range(1, m + 1):
-        for j in range(1, n + 1):
-            match_cost = euclidean_distance(sequence_a[i - 1], sequence_b[j - 1])
-            deletion_cost = erp_matrix[i - 1][j] + euclidean_distance(sequence_a[i - 1], gap)
-            insertion_cost = erp_matrix[i][j - 1] + euclidean_distance(gap, sequence_b[j - 1])
-
-            # Take the minimum of match, deletion, or insertion costs
-            erp_matrix[i][j] = min(match_cost + erp_matrix[i - 1][j - 1], deletion_cost, insertion_cost)
-
-    # The ERP distance between the two sequences
-    erp_distance = erp_matrix[m][n]
-
-    # Backtracking to retrieve the path
-    i, j = m, n
-    path = []
-
-    while i > 0 or j > 0:
-        current_cost = erp_matrix[i][j]
-        if i > 0 and j > 0 and current_cost == erp_matrix[i - 1][j - 1] + euclidean_distance(sequence_a[i - 1], sequence_b[j - 1]):
-            path.append((i - 1, j - 1))  # Match
-            i -= 1
+    i, j = n, m
+    path = [(i - 1, j - 1)]
+    while i > 1 or j > 1:
+        if i == 1:
             j -= 1
-        elif i > 0 and current_cost == erp_matrix[i - 1][j] + euclidean_distance(sequence_a[i - 1], gap):
-            path.append((i - 1, None))  # Deletion (gap in sequence_b)
+        elif j == 1:
             i -= 1
         else:
-            path.append((None, j - 1))  # Insertion (gap in sequence_a)
-            j -= 1
+            min_cost = min(cost[i - 1, j], cost[i, j - 1], cost[i - 1, j - 1])
+            if min_cost == cost[i - 1, j - 1]:
+                i -= 1
+                j -= 1
+            elif min_cost == cost[i, j - 1]:
+                j -= 1
+            else:
+                i -= 1
+        path.append((i - 1, j - 1))
 
-    # Reverse the path to make it start-to-end
-    path = path[::-1]
 
-    print("ERP Distance:", erp_distance)
-    print("Optimal Path:", path)
+    path.reverse()
+    return dtw_distance, path

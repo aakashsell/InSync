@@ -3,12 +3,12 @@ import random
 import zipfile
 import os
 
+import xml.etree.ElementTree as ET
 
 def parse_musicxml_file(file_path):
     tree = ET.parse(file_path)
     root = tree.getroot()
     parts = {}
-    time_signature = None  # Initialize time_signature variable
 
     # Default tempo in beats per minute (quarter notes per minute)
     default_tempo = 120  # Default tempo if not specified
@@ -20,14 +20,6 @@ def parse_musicxml_file(file_path):
         onset_time = 0  # Running total to calculate the relative onset time
         divisions_element = root.find(".//attributes/divisions")
         divisions = float(divisions_element.text) if divisions_element is not None else 1
-
-        # Get time signature
-        time_signature_element = root.find(".//attributes/time")
-        if time_signature_element is not None:
-            beats = time_signature_element.find("beats")
-            beat_type = time_signature_element.find("beat-type")
-            if beats is not None and beat_type is not None:
-                time_signature = f"{beats.text}/{beat_type.text}"
 
         tempo = default_tempo  # Initialize with default tempo
 
@@ -44,9 +36,10 @@ def parse_musicxml_file(file_path):
             for note in measure:
                 pitch = None
                 duration = 0
+                staff = note.find("staff")
 
                 # Check for rests or notes with missing duration
-                if note.tag == "note":
+                if note.tag == "note" and (staff is None or staff.text == '1'):
                     is_chord = note.find("chord") is not None
 
                     # Get duration if this is not part of a chord or first note of a chord
@@ -55,13 +48,15 @@ def parse_musicxml_file(file_path):
                         # Convert MusicXML duration to seconds based on divisions and quarter note duration
                         duration = (int(duration_element.text) / divisions) * quarter_note_duration
 
+
                     # Separate assignment for pitch
                     pitch_tag = note.find("pitch")
                     if pitch_tag is not None:
                         pitch = f"{pitch_tag.find('step').text}{pitch_tag.find('octave').text}"
 
-                    # Append the note or chord data with the onset time
-                    chord_notes.append((pitch, onset_time, duration))
+                    # Add a small random delay to the onset time (e.g., between -0.02 and 0.02 seconds)
+                    onset_delay = random.uniform(0, 0.02)
+                    chord_notes.append((pitch, onset_time + onset_delay, duration))
 
                     # If not a chord note, commit the chord notes and increment onset
                     if not is_chord:
@@ -70,8 +65,9 @@ def parse_musicxml_file(file_path):
                         onset_time += duration  # Increment onset by the total duration of the chord or note
 
         parts[part_id] = notes
+    return parts
 
-    return parts, time_signature  # Return both parts and time_signature
+
 
 
 def create_delayed(file_path):
