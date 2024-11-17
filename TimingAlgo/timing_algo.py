@@ -8,9 +8,10 @@ from parse_musicxml import *
 from file_conversions import *
 from processing import *
 
-import partitura as pt
 
 from music21 import converter, note
+
+
 
 def parse_audio(file_path):
     file = open(file_path, mode='r')
@@ -24,10 +25,20 @@ def parse_audio(file_path):
 
     lines = lines[1:len(lines)-1]
 
+
     for line in lines:
         line_data = line.split()
-        tmp_data = (int(float(line_data[0])), float(line_data[1]), float(line_data[2]) - float(line_data[1]))
-        data.append(tmp_data)
+
+        if(len(line_data) == 3):
+
+            pitch = int(float(line_data[0]))
+            onset = float(line_data[1])
+            duration = float(line_data[2]) - float(line_data[1])
+
+            tmp_data = (pitch, onset, duration)
+            data.append(tmp_data)
+    
+    
         
     return data
 
@@ -37,6 +48,8 @@ def find_out_of_sync(shared_notes, singer_sm2audio, piano_sm2audio, singer_audio
     s_path = {}
     p_path = {}
     thres = 0.01
+
+    convert_back = {}
 
 
     delays = []
@@ -62,7 +75,8 @@ def find_out_of_sync(shared_notes, singer_sm2audio, piano_sm2audio, singer_audio
         diff = s[1] - p[1]
 
         if diff > thres:
-            delays.append((s[1], diff))
+            delays.append((s_path[val[0]], diff))
+    
 
 
     return delays
@@ -98,30 +112,30 @@ def find_simultaneous_notes(notes1, notes2, time_tolerance=0.01):
 
 
 # Example usage
-file_path = "./test.xml"
+file_path = "./score.xml"
 
 audio_data = "./temp.out"
 
 
-def main(sheet_music_path, audio_data_path):
+def timing_algo(sheet_music_path, audio_data_path):
 
     parts_data = parse_musicxml_file(sheet_music_path)
-    delay_data = delayed_music(sheet_music_path)
 
     singer_sm = parts_data.get('P1', None)
-    singer_sm = [(note.Note(val[0]).pitch.midi, val[1], val[2]) for val in singer_sm]
+    singer_sm = [(note.Note(val[0]).pitch.midi if val[0] != 'rest' else 0, val[1], val[2]) for val in singer_sm]
 
-    singer_delay = delay_data.get('P1')
-    singer_delay = [(note.Note(val[0]).pitch.midi, val[1], val[2]) for val in singer_delay]
+
 
 
     piano_sm = parts_data.get('P2', None)
+    #piano_sm = [(note.Note(val[0]).pitch.midi if val[0] is not None else 0, val[1], val[2]) for val in piano_sm]
 
-    same = find_simultaneous_notes(singer_sm, singer_sm)
+    #piano_delay = delay_data.get('P2')
+    #piano_delay = [(note.Note(val[0]).pitch.midi, val[1], val[2]) for val in piano_delay]
 
 
 
-    
+    same = find_simultaneous_notes(singer_sm, piano_sm)
 
     
 
@@ -129,24 +143,32 @@ def main(sheet_music_path, audio_data_path):
 
     singer_audio = parse_audio(audio_data_path)
 
+
+
+    singer_distance, singer_path = process(singer_sm, singer_audio)
+
+
+    
+    for line in singer_path:
+        #print(str(singer_sm[line[0]]) + " + " + str(singer_audio[line[1]]))
+        print(line)
+        pass
+
+
+
+
  
 
-    singer_distance, singer_path = process(singer_sm, singer_sm)
 
-    piano_distance, piano_path = process(singer_sm, singer_delay)
+   # piano_distance, piano_path = process(piano_sm, piano_delay)
 
     
 
     piano_audio = None
 
-    out = find_out_of_sync(same, singer_path, singer_path, singer_sm, singer_delay)
+   # out = find_out_of_sync(same, singer_path, piano_path, singer_delay, piano_delay)
 
-    print(out)
-
-    #print(distance)
-
-    #for p in same:
-        #print(str(singer_sm[p[0]]) + " + "  + str(piano_sm[p[1]]))
+    #print(out)
 
         
 
@@ -165,7 +187,7 @@ def main(sheet_music_path, audio_data_path):
 
 
 if __name__ == "__main__":
-    main(file_path, audio_data)
+    timing_algo(file_path, audio_data)
 
 
 
