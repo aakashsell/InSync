@@ -26,8 +26,15 @@ def parse_audio(file_path):
     lines = lines[1:len(lines)-1]
 
 
-    for line in lines:
+    for i in range(len(lines)):
+        line = lines[i]
         line_data = line.split()
+
+        if(len(line_data) == 1):
+            if i > 0 and i < len(lines) - 1:
+                prev = lines[i-1].split()
+                next = lines[i+1].split()
+                data.append((0, float(prev[2]), float(next[1]) - float(prev[2])))
 
         if(len(line_data) == 3):
 
@@ -48,8 +55,6 @@ def find_out_of_sync(shared_notes, singer_sm2audio, piano_sm2audio, singer_audio
     s_path = {}
     p_path = {}
     thres = 0.01
-
-    convert_back = {}
 
 
     delays = []
@@ -114,7 +119,10 @@ def find_simultaneous_notes(notes1, notes2, time_tolerance=0.01):
 # Example usage
 file_path = "./score.xml"
 
-audio_data = "./temp.out"
+voice_data = "./voice.out"
+
+piano_data = "./piano.out"
+
 
 
 def timing_algo(sheet_music_path, audio_data_path):
@@ -128,10 +136,8 @@ def timing_algo(sheet_music_path, audio_data_path):
 
 
     piano_sm = parts_data.get('P2', None)
-    #piano_sm = [(note.Note(val[0]).pitch.midi if val[0] is not None else 0, val[1], val[2]) for val in piano_sm]
+    piano_sm = [(note.Note(val[0]).pitch.midi if val[0] != 'rest' else 0, val[1], val[2]) for val in piano_sm]
 
-    #piano_delay = delay_data.get('P2')
-    #piano_delay = [(note.Note(val[0]).pitch.midi, val[1], val[2]) for val in piano_delay]
 
 
 
@@ -141,16 +147,22 @@ def timing_algo(sheet_music_path, audio_data_path):
 
 
 
-    singer_audio = parse_audio(audio_data_path)
+    singer_audio = parse_audio(audio_data_path[0])
+
+    piano_audio = parse_audio(audio_data_path[1])
 
 
 
     singer_distance, singer_path = process(singer_sm, singer_audio)
 
 
+    piano_distance, piano_path = process(piano_sm, piano_audio)
+
+    delays = find_out_of_sync(same, singer_path, piano_path, singer_audio, piano_audio)
+
     
-    for line in singer_path:
-        #print(str(singer_sm[line[0]]) + " + " + str(singer_audio[line[1]]))
+    
+    for line in delays:
         print(line)
         pass
 
@@ -187,7 +199,7 @@ def timing_algo(sheet_music_path, audio_data_path):
 
 
 if __name__ == "__main__":
-    timing_algo(file_path, audio_data)
+    timing_algo(file_path, [voice_data, piano_data])
 
 
 
