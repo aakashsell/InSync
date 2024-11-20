@@ -1,47 +1,70 @@
 import numpy as np
 
-def calculate_distance(a, b, onset_weight=2000.0, pitch_weight=0.0, duration_weight=1.0):
+weights = np.array([0, 5, 8])  # Adjust as necessary
+
+def cost_function(a, b):
     # Apply weights to onset time difference, pitch, and duration to prioritize onset time
-    pitch_diff = abs(a[0] - b[0]) * pitch_weight
-    onset_diff = abs(a[1] - b[1]) * onset_weight
-    duration_diff = abs(a[2] - b[2]) * duration_weight
-    
-    return pitch_diff + onset_diff + duration_diff
+    note1 = np.array(a)
+    note2 = np.array(b)
 
-def process(array1, array2, threshold=10.0):
-    n, m = len(array1), len(array2)
-    cost = np.inf * np.ones((n + 1, m + 1))  # Initialize cost matrix
-    cost[0, 0] = 0.0  # Starting point should be 0,0
+    if(a[0] == 0 and b[0] != 0):
+        return 1000000
     
-    path = []  # To track the alignment path
+    return np.sum(weights * np.abs(note1 - note2))
 
-    # DP to calculate cost and track valid matches
+def process(sheet_music, audio_data, threshold=100, local_constraint=None):
+    n = len(sheet_music)
+    m = len(audio_data)
+    
+    # Initialize cost matrix with large values
+    cost_matrix = np.full((n + 1, m + 1), np.inf)
+    cost_matrix[0, 0] = 0  # Starting point
+
+    # Fill cost matrix
     for i in range(1, n + 1):
         for j in range(1, m + 1):
-            # Calculate distance
-            distance = calculate_distance(array1[i - 1], array2[j - 1])
             
-            # Skip points in array2 if the distance is too large (extraneous)
-            if distance > threshold:
-                continue  # Skip extraneous points in array2
-            
-            # Otherwise, calculate cost and update cost matrix
-            cost[i, j] = min(cost[i - 1, j - 1], cost[i, j - 1], cost[i - 1, j]) + distance
+            cost = cost_function(sheet_music[i - 1], audio_data[j - 1])
 
-    # Reconstruct the path (this part can be modified based on the alignment logic)
+            
+
+            cost_matrix[i, j] = cost + min(
+                cost_matrix[i - 1, j],      # Insertion
+                cost_matrix[i, j - 1],      # Deletion
+                cost_matrix[i - 1, j - 1]   # Match
+            )
+
+
+            
+
+    # Backtrack to find the optimal path, skipping invalid paths
     i, j = n, m
-    while i > 0 and j > 0:
-        path.append((i - 1, j - 1))
+    alignment_path = []
+    while i > 0 or j > 0:
+        if cost_matrix[i, j] == np.inf:  # Skip invalid matches
+            if i > 0:
+                i -= 1
+            elif j > 0:
+                j -= 1
+            continue
         
-        # Check where the minimum cost came from to decide the path
-        if cost[i, j] == cost[i - 1, j - 1] + calculate_distance(array1[i - 1], array2[j - 1]):
+        alignment_path.append((i - 1, j - 1))
+        
+        # Choose the direction with the smallest cost (insertion, deletion, or match)
+        if i > 0 and j > 0 and cost_matrix[i - 1, j - 1] <= cost_matrix[i - 1, j] and cost_matrix[i - 1, j - 1] <= cost_matrix[i, j - 1]:
             i -= 1
             j -= 1
-        elif cost[i, j] == cost[i, j - 1] + calculate_distance(array1[i - 1], array2[j - 1]):
-            j -= 1
+        elif i > 0 and (j == 0 or cost_matrix[i - 1, j] <= cost_matrix[i, j - 1]):
+            i -= 1
         else:
-            i -= 1
+            j -= 1
 
-    path.reverse()  # Reverse to get the correct path order
-    
-    return cost[n, m], path
+    alignment_path.reverse()
+
+    # Calculate the total cost of the alignment, ensuring we don't return None
+    total_cost = cost_matrix[n, m]
+
+    # Even if the cost exceeds the threshold, still return the path, possibly suboptimal
+    return total_cost, alignment_path
+
+
