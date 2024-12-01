@@ -1,58 +1,92 @@
 #! /usr/bin/env python
 
-# Use pyaudio to open the microphone and run aubio.pitch on the stream of
-# incoming samples. If a filename is given as the first argument, it will
-# record 5 seconds of audio to this location. Otherwise, the script will
-# run until Ctrl+C is pressed.
-
 # Some portions of code modified from:
 #    $ ./python/demos/demo_pyaudio.py
 #    $ ./python/demos/demo_pyaudio.py /tmp/recording.wav
 
 '''
-For MVP
-1. Detect and connect to Scarlett USB Device
-Method A:
-a2. Record into file (to save for user listening)
-a3. Run file through aubio
-Method B:
-b2. Pipe audio directly into aubio (lose ability to re-listen)
-...
-4. Provide output file to audio timing algorithm
+    InSync Project, audio processing file. Performs the following operations
 
-Challenges:
-Chord Handling; might need a fft and custom chord detection alg. 
+    Recording:
+        Selects specified audio interface and records sound to a .wav file based
+        on command line input. Will pipe recorded data into the Audio Processing
+        methods automatically.
+    
+    Audio Processing:
+        Processes a .wav file into a tuple of data in the form:
+        {Midi Note, Start Time (seconds), Duration (seconds)}
+
+        Uses the Aubio library to perform pitch estimation, note onset timing, and
+        (less accurately) note duration. Note duration is calculated using the 
+        produced start and end timing values from the aubio notes process. pitch
+        estimation is performed using a FFT which finds the moving average between
+        note onsets based on Aubio's fundamental frequency detection algorithm.
 '''
-from pynput import keyboard
-
 import numpy as np # Sspecific float data type
 import aubio # Audio processing
 import pyaudio # Audio recording
 import os # Run aubio command line tools
+import wave
 
 import sys # Get arguments
+from Utils.util_Conversions import *
 
 # Constants for audio stream
-BUFFER_SIZE = 1024  # Standard Buffer Size
+BUFFER_SIZE = 256  # Standard Buffer Size
 SAMPLE_RATE = 44100  # Common sample rate for audio
 PITCH_TOLERANCE = 0.8 # Required confidence of pitch value
 DEFAULT_BPM = 120 # Number of quarter-notes per minute
 AUDIO_FORMAT = pyaudio.paFloat32 # Float format of audio data
+MAX_MIDI = 108 # Highest note on a piano C8
+
+# Index Constants for data tuple
+MIDI_INDEX = 0
+ONSET_INDEX = 1
+DURATION_INDEX = 2
+STOP_INDEX = 2
 
 # Global Semaphore 
 VERBOSE_MODE = False # If enabled, print information while recording
 RECORDING = -1 # Set to 1 if a piece is being recorded
 
+def data_to_line(midi:float, onset:float, duration:float):
+    """
+        Converts note data into a line of formatted output data. Rounds float 
+        values to 3 decimal places.
+
+        Args:
+            midi (float): midi value of the note
+            onset (float): onset time of the note
+            duration (float): duration of the note
+        Returns:
+            string (str): string containing args sequentially seperated by a tab
+    """
+    return format(f"{midi:.0f}\t{onset:.4f}\t{duration:.4f}")
+
+def line_to_data(line:str):
+    """
+        Converts a unprocessed string of float data and seperates it into a tuple of
+        floats using the tab (\t) delimiter
+
+        Args:
+            line (str): line in file to process
+        Returns:
+            tuple ([float]): tuple of float values
+    """
+    l = line.strip().split('\t')
+    for i in range(len(l)):
+        l[i] = round(float(l[i]), 4)
+    return l
+
 def key_press_handler(key):
     if key == 's':  # Interrupt on 's' key press
         RECORDING = 0
 
-# @param name is the name of the device to be searched for
-# @return output is the index of the audio device, or the default if none found
-# The device index is used by pyaudio to select I/O
 def find_device(name='Scarlett'):
     """
-    Searches for a Scarlett Audio Interface and returns its device index
+    Searches for a Scarlett Audio Interface and returns its device index. Returns
+    default audio device of the system (typically built-in microphone) if none found.
+    The device index is used by pyaudio to select I/O
 
     Args:
         name (str): Name of audio device to be found. Defaults to "Scarlett"
@@ -76,33 +110,133 @@ def find_device(name='Scarlett'):
     return 0
 
 def process_file(audio_source:str):
-    # audio_source = "Test_Recordings/simple_scale.wav"
+    """
+        Converts a wav file given as the audio source into a data stream of tuples
+        containing the detected pitch (midi value), its time of onset, and its approximate duration.
+        Periods of silence are marked by a midi value of 0. 
+
+        Args:
+            audio_source (str): A string containing the file path of a .wav file to process
+        Returns:
+            None
+    """
     destination = "temp.out"
-    
-    os.system("aubio notes " + audio_source + " > " + destination)
-
+    os.system("aubio notes " + audio_source + " -s -45 " +" > " + destination)
     f = open(destination,'r') #read data from destination file  
-    data = []
-    for line in f:
-        cols = line.strip().split('\t')
-        data.append(cols)
     
-    # first line is the start time
-    start_time = data[0]
-    # second line is the end time
-    stop_time = data[-1][0]
-    data = data[1:-1] #trim
+    unprocessed_data = []
+    for line in f: unprocessed_data.append(line_to_data(line))
+    # unprocessed_data is now an 2D array where each line contains
+    # [midi val, start time, duration]
+        
+    processed_note_data = []
+    for line in range(len(unprocessed_data)):
+        line_data = unprocessed_data[line]
+        
+        # case: only one value, i.e. silence
+            # add silence note
+            # if at end (no next), ignore
+            # considers multiple silences stacked
+        if(len(line_data) == 1):
+            curr_midi = 0
+            curr_start = line_data[0]
 
-    # want to change last element of each output to be duration
-    for note in data:
-        try:
-            if (note[0] < 100):
-                note[2] = float(note[2]) - float(note[1])
-                print(note)
-        except: 
-            pass
+            if(line == len(unprocessed_data)-1): 
+                break #last line of the output, ignore silence
+            else:
+                # find previous ending
+                prev_end = 0
+                if(line != 0): #not the first entry
+                    prev_data = unprocessed_data[line-1]
+                    if(len(prev_data) == 3):
+                        prev_end = prev_data[STOP_INDEX]
+                    else:
+                        # in theory should never execute
+                        prev_line = line - 2
+                        while(prev_line > 0):
+                            prev_data = unprocessed_data[line-1]
+                            if(len(prev_data) == 3):
+                                prev_end = prev_data[STOP_INDEX]
+
+                # find next start, if none exists (multiple ending silence 
+                # values or last value), ignore
+                next_line_data = unprocessed_data[line+1]
+                if(len(next_line_data) == 3):
+                    next_midi, next_start, next_end = next_line_data
+                    duration = next_start - prev_end
+                    if(duration == 0): 
+                        continue
+                    else:
+                        temp_data = [curr_midi, prev_end, duration]
+                        processed_note_data.append(temp_data)
+                else:
+                    #multiple silence values
+                    next_line = line+2
+                    while(next_line < len(unprocessed_data)-1):
+                        #try to find non silent processed_note_data
+                        next_line_data = line_to_data(f[next_line])
+                        if(len(next_line_data) == 3):
+                            next_start = next_line_data[STOP_INDEX]
+                            temp_data = [curr_midi, curr_start, next_start-curr_start]
+                            duration = next_start - prev_end
+                            if(duration == 0): 
+                                continue
+                            else:
+                                temp_data = [curr_midi, curr_start, duration]
+                                processed_note_data.append(temp_data)
+
+
+        
+        elif(len(line_data) == 3):
+            curr_midi, curr_start, curr_end = line_data
+            temp_data = [curr_midi, curr_start, curr_end-curr_start]
+
+            # case: value outside threshold
+            # attempt to append to next note
+                # midi = next_midi
+                # start = curr_start
+                # duration = next_end - curr_start
+            if(curr_midi > MAX_MIDI and line != len(unprocessed_data)-1):
+                next_line_data = unprocessed_data[line+1]
+
+                if(len(next_line_data) == 3):
+                    next_midi, next_start, next_end = next_line_data
+                    temp_data = [next_midi, curr_start, next_end-curr_start]
+                
+                else: #Next value is silence
+                    pass
+
+            processed_note_data.append(temp_data)
+    f.close()
+
+    # normalize starting time
+    start_time_ofset = 0
+    if(processed_note_data[0][MIDI_INDEX] == 0):
+        start_time_ofset = processed_note_data[0][DURATION_INDEX]
+        processed_note_data = processed_note_data[1:]
     
+    processed_data_out = open("modfied.out", 'w')
+    for note in processed_note_data:
+        note[ONSET_INDEX] = note[ONSET_INDEX] - start_time_ofset
+        line = data_to_line(note[MIDI_INDEX], note[ONSET_INDEX], note[DURATION_INDEX])
+        processed_data_out.write(line + "\n")
+        if VERBOSE_MODE:
+            pitch, start, duration = line_to_data(line)
+            pitch = aubio.midi2note(int(float(pitch)))
+            print(f"({pitch},{start},{duration})")
+    processed_data_out.close()
+                   
 def record_audio(filename:str, audio_interface_index:int, num_channels:int=1):
+    """
+        Records an audio stream into a .wav file created from the file name given.
+        Then processes the audio file into an output file.
+
+        Args:
+            filename (str): Name of the produced .wav file -> filename.wav
+            audio_interface_index (int): Audio interface to record from
+            num_channels (int): Number of input channels to record from the audio interface
+    """
+    
     # initialise pyaudio
     audio_data = pyaudio.PyAudio()
     audio_interface_index = find_device()
@@ -116,8 +250,6 @@ def record_audio(filename:str, audio_interface_index:int, num_channels:int=1):
                     frames_per_buffer=BUFFER_SIZE,
                     input_device_index=audio_interface_index)
 
-    #TO-DO: Have multiple channel inputs
-    #TO-DO: Stop recording on interupt or timeout
     outputsink = aubio.sink(filename, SAMPLE_RATE) 
 
     # setup pitch
@@ -128,25 +260,22 @@ def record_audio(filename:str, audio_interface_index:int, num_channels:int=1):
     aub_pitch = aubio.pitch("default", win_s, hop_s, SAMPLE_RATE)
     aub_onset = aubio.onset("default", win_s, hop_s, SAMPLE_RATE)
 
-    #TO-DO Duration functionality
-
     aub_pitch.set_unit("midi")
     aub_pitch.set_tolerance(PITCH_TOLERANCE)
 
     #use "phase" Method for polyphonic onset
 
-    # Create a thread for monitoring keyboard input
-    # listener = keyboard.Listener(on_press=key_press_handler)
-    # listener.start()
-
     print("*** Starting Recording ***")
     if VERBOSE_MODE:
         print("Recording to \"Recordings/" + filename)
+    
+    wav_data = []
     
     while RECORDING:
         try:
             audiobuffer = stream.read(BUFFER_SIZE)
             signal = np.frombuffer(audiobuffer, dtype=np.float32)
+            wav_data.append(signal)
 
             pitch = aub_pitch(signal)[0]
             confidence = aub_pitch.get_confidence()
@@ -157,22 +286,29 @@ def record_audio(filename:str, audio_interface_index:int, num_channels:int=1):
                 if onset != 0: 
                     print(f"onset {onset}")
                     print("{} / {}".format(pitch,confidence))
-            
-            #write to output file if one is given
-            if outputsink: 
-                outputsink(signal, len(signal))
 
-        # Make this a generic keyboard input
         except KeyboardInterrupt:
             print("*** Ctrl-C Pressed, Exiting ***")
             break
 
     print("*** Done Recording ***")
+
+    # Clean up PyAudio
     stream.stop_stream()
     stream.close()
     audio_data.terminate()
 
+    # Create WAV file
+    output_file_name = RECORDING_PREFIX + ".wav"
+    wav_file = wave.open(output_file_name, 'wb')
+    wav_file.setnchannels(num_channels)
+    wav_file.setsampwidth(audio_data.get_sample_size(AUDIO_FORMAT))
+    wav_file.setframerate(SAMPLE_RATE)
+    wav_file.writeframes(b''.join(wav_data))
+    wav_file.close()
 
+    # Run Audio Processing
+    process_file(output_file_name)
 
 import argparse
 
@@ -180,7 +316,7 @@ parser = argparse.ArgumentParser(description="Initializing InSync...")
 parser.add_argument("-f","--filename", help="Path of file to process. Does not record audio")
 parser.add_argument("-b","--bpm", help="The bpm of the piece")
 parser.add_argument("-p","--piece", help="Name of the piece used to label recordings")
-parser.add_argument("-v","--verbose", help="Provides verbose output during recording")
+parser.add_argument("-v","--verbose", help="Provides verbose output during recording", action='store_false')
 
 args = parser.parse_args()
 
@@ -212,16 +348,20 @@ for arg in sys.argv[1:]:
 
 if RECORDING:
     device_index = find_device()
-    record_audio(RECORDING_PREFIX,device_index)
+    record_audio(RECORDING_PREFIX, device_index)
     
-process_file(FILENAME_TO_PROCESS)
+else:
+    process_file(FILENAME_TO_PROCESS)
 
+# TODO:
 # Set up single input scarlett input for singer microphone
 # Set up stereo input scarlett input for piano microphones
 # Record both seperately into two files
     # Files need to have a naming convention
+    # Have multiple channel inputs
 # From each file run Aubio notes to generate output
     # Filter out noise
+        # Appened spikes to next note
     # Check for articulations
-    # Attampt chord handling
+    # Attempt chord handling
     # Clean up and save in data folder
