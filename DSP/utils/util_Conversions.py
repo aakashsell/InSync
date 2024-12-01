@@ -1,6 +1,6 @@
 """
 Author: Ben Martinez
-Last Updated: 11/5/24
+Last Updated: 11/15/24
 
 Utility functions that help handle conversions between time and bpm, midi value 
 and readable pitch object.
@@ -8,7 +8,7 @@ and readable pitch object.
 
 import aubio
 import math
-import projectConstants
+from Utils import util_Constants
 
 def util_midi_to_note(midi:float):
     note = round(midi)
@@ -57,10 +57,10 @@ def beats_from_duration(duration:float, bpm:int):
         bpm (int): beats per minute of piece
 
     Returns:
-        float: Number of beats the note lasted
+        (float) Number of beats the note lasted
     """
-    seconds_per_beat = seconds_per_beat(bpm)
-    return duration/seconds_per_beat
+    sec_per_beat = seconds_per_beat(bpm)
+    return duration/sec_per_beat
 
 def beat_to_samples(dur:float, bpm:int=60):
     60/bpm
