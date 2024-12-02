@@ -8,7 +8,6 @@ and readable pitch object.
 
 import aubio
 import math
-import projectConstants
 
 def util_midi_to_note(midi:float):
     note = round(midi)
