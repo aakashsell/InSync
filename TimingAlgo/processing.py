@@ -1,6 +1,6 @@
 import numpy as np
 
-weights = np.array([0, 5, 8])  # Adjust as necessary
+weights = np.array([5, 5, 10])  # Adjust as necessary
 
 def cost_function(a, b):
     # Apply weights to onset time difference, pitch, and duration to prioritize onset time
@@ -16,7 +16,6 @@ def process(sheet_music, audio_data, threshold=100, local_constraint=None):
     n = len(sheet_music)
     m = len(audio_data)
     
-    # Initialize cost matrix with large values
     cost_matrix = np.full((n + 1, m + 1), np.inf)
     cost_matrix[0, 0] = 0  # Starting point
 
@@ -36,12 +35,10 @@ def process(sheet_music, audio_data, threshold=100, local_constraint=None):
 
 
             
-
-    # Backtrack to find the optimal path, skipping invalid paths
     i, j = n, m
     alignment_path = []
     while i > 0 or j > 0:
-        if cost_matrix[i, j] == np.inf:  # Skip invalid matches
+        if cost_matrix[i, j] == np.inf:  
             if i > 0:
                 i -= 1
             elif j > 0:
@@ -50,7 +47,6 @@ def process(sheet_music, audio_data, threshold=100, local_constraint=None):
         
         alignment_path.append((i - 1, j - 1))
         
-        # Choose the direction with the smallest cost (insertion, deletion, or match)
         if i > 0 and j > 0 and cost_matrix[i - 1, j - 1] <= cost_matrix[i - 1, j] and cost_matrix[i - 1, j - 1] <= cost_matrix[i, j - 1]:
             i -= 1
             j -= 1
@@ -61,10 +57,8 @@ def process(sheet_music, audio_data, threshold=100, local_constraint=None):
 
     alignment_path.reverse()
 
-    # Calculate the total cost of the alignment, ensuring we don't return None
     total_cost = cost_matrix[n, m]
 
-    # Even if the cost exceeds the threshold, still return the path, possibly suboptimal
     return total_cost, alignment_path
 
 

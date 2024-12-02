@@ -41,7 +41,7 @@ def insert_sorted(l1, l2):
 
 
 
-def parse_musicxml_file(file_path, tempo):
+def parse_musicxml_file(file_path, tempo=60):
     tree = ET.parse(file_path)
     root = tree.getroot()
 
@@ -56,6 +56,7 @@ def parse_musicxml_file(file_path, tempo):
         tempo = int(metronome_tempo.text)
     elif sound_tempo is not None and 'tempo' in sound_tempo.attrib:
         tempo = int(sound_tempo.attrib['tempo'])
+
 
 
     # Loop through each part
