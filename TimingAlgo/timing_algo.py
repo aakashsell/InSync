@@ -1,12 +1,13 @@
 # Aakash Sell (asell)
 
 
-import time, math
+import math
 
 
 from parse_musicxml import *
 from processing import *
 import matplotlib.pyplot as plt
+from tests import *
 
 
 from music21 import note
@@ -54,7 +55,7 @@ def plot_paths(sheet_data, audio_data, part, matching_paths):
             color='red',
             marker='o',
             markersize=5,
-            label="Piano Sheet Music" if idx == 0 else ""
+            label="Singer Audio Data" if idx == 0 else ""
         )
 
     # Plot matching paths
@@ -140,9 +141,9 @@ def parse_audio(file_path):
     data = []
 
     start = float(lines[0].strip())
-    end = float(lines[-1].strip())
+    #end = float(lines[-1].strip())
 
-    lines = lines[1:len(lines)-1]
+    lines = lines[1:len(lines)]
 
     for i in range(0, len(lines)):
         line = lines[i]
@@ -375,17 +376,20 @@ def timing_algo(sheet_music_path, audio_data_path):
     print("...")
     print()
 
+    for val in singer_audio:
+        print(val)
 
 
 
-    plot_paths(piano_sm, piano_audio, "piano", piano_path)
 
-    #plot_paths(singer_sm, singer_audio, "singer", singer_path)
+    #plot_music(singer_sm, singer_audio, "singer")
+
+    plot_paths(singer_sm, singer_audio, "singer", singer_path)
 
 
     #plot_paths(singer_audio, piano_audio, "Both", clean_delays)
 
-   # show_delays(singer_audio, piano_audio, "both", clean_delays)
+    #show_delays(singer_audio, piano_audio, "both", clean_delays)
 
     #print(singer_path)
 
