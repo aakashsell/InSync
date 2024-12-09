@@ -29,11 +29,7 @@ import os # Run aubio command line tools
 import wave
 
 import sys # Get arguments
-<<<<<<< HEAD
 from utils.util_Conversions import *
-=======
-from Utils.util_Conversions import *
->>>>>>> 7fbdad3ed8674094b6af5d4391fe62504c07965f
 
 # Constants for audio stream
 BUFFER_SIZE = 256  # Standard Buffer Size
@@ -47,10 +43,7 @@ MAX_MIDI = 108 # Highest note on a piano C8
 MIDI_INDEX = 0
 ONSET_INDEX = 1
 DURATION_INDEX = 2
-<<<<<<< HEAD
-=======
 STOP_INDEX = 2
->>>>>>> 7fbdad3ed8674094b6af5d4391fe62504c07965f
 
 # Global Semaphore 
 VERBOSE_MODE = False # If enabled, print information while recording
@@ -128,11 +121,7 @@ def process_file(audio_source:str):
             None
     """
     destination = "temp.out"
-<<<<<<< HEAD
-    os.system("aubio notes " + audio_source + " -s -45 " + " > " + destination)
-=======
-    os.system("aubio notes " + audio_source + " -s -45 " +" > " + destination)
->>>>>>> 7fbdad3ed8674094b6af5d4391fe62504c07965f
+    os.system("aubio notes " + audio_source + " -s -55 " +" > " + destination)
     f = open(destination,'r') #read data from destination file  
     
     unprocessed_data = []
@@ -160,24 +149,14 @@ def process_file(audio_source:str):
                 if(line != 0): #not the first entry
                     prev_data = unprocessed_data[line-1]
                     if(len(prev_data) == 3):
-<<<<<<< HEAD
-                        prev_end = prev_data[2]
-=======
                         prev_end = prev_data[STOP_INDEX]
->>>>>>> 7fbdad3ed8674094b6af5d4391fe62504c07965f
                     else:
                         # in theory should never execute
                         prev_line = line - 2
                         while(prev_line > 0):
                             prev_data = unprocessed_data[line-1]
                             if(len(prev_data) == 3):
-<<<<<<< HEAD
-                                prev_end = prev_data[2]
-                # default is 0 in the case there are multiple (somehow) stacked
-                # starting silence values
-=======
                                 prev_end = prev_data[STOP_INDEX]
->>>>>>> 7fbdad3ed8674094b6af5d4391fe62504c07965f
 
                 # find next start, if none exists (multiple ending silence 
                 # values or last value), ignore
@@ -197,11 +176,7 @@ def process_file(audio_source:str):
                         #try to find non silent processed_note_data
                         next_line_data = line_to_data(f[next_line])
                         if(len(next_line_data) == 3):
-<<<<<<< HEAD
-                            next_start = next_line_data[2]
-=======
                             next_start = next_line_data[STOP_INDEX]
->>>>>>> 7fbdad3ed8674094b6af5d4391fe62504c07965f
                             temp_data = [curr_midi, curr_start, next_start-curr_start]
                             duration = next_start - prev_end
                             if(duration == 0): 
