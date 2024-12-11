@@ -29,7 +29,7 @@ import os # Run aubio command line tools
 import wave
 
 import sys # Get arguments
-from utils.util_Conversions import *
+from Utils.util_Conversions import *
 
 # Constants for audio stream
 BUFFER_SIZE = 256  # Standard Buffer Size
