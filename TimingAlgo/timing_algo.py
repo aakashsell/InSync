@@ -7,9 +7,15 @@ import matplotlib.pyplot as plt
 from parse_musicxml import parse_musicxml_file
 from processing import process
 from music21 import note
-
-
+import socket
+import struct
+import pickle
 # Plot Functions
+class Info:
+    def __init__(self,is_sync, beat):
+        self.is_sync = is_sync
+        self.beat = beat
+
 def plot_music(sheet_data, audio_data, part): 
     plt.figure(figsize=(10, 6))
 
@@ -60,14 +66,13 @@ def parse_audio(file_path):
     with open(file_path, mode='r') as file:
         lines = file.readlines()
 
-    start = float(lines[0].strip())
     data = []
 
     for line in lines[1:]:
         line_data = line.split()
         if len(line_data) == 3:
             pitch = int(float(line_data[0]))
-            onset = float(line_data[1]) - start
+            onset = float(line_data[1])
             duration = float(line_data[2]) - float(line_data[1])
             data.append((pitch, onset, duration))
     
@@ -145,8 +150,29 @@ def timing_algo(sheet_music_path, audio_data_paths):
     # Find out-of-sync notes
     shared_notes = find_simultaneous_notes(singer_sm, piano_sm)
     delays, new_path = find_out_of_sync(shared_notes, dict(singer_path), dict(piano_path), singer_audio, piano_audio, tempo)
-
+    HOST = "127.0.0.1"  # The server's hostname or IP address
+    PORT = 65432  # The port used by the server
     # Plot results
+    print(delays)
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.connect((HOST, PORT))
+        for status in delays:
+        
+            res = Info(False, status[0])
+            print(f"beat: {res.beat}, start_status: {res.is_sync}")
+            
+            my_bytes = pickle.dumps(res)
+            print(f"test {len(my_bytes)}")
+            s.sendall(struct.pack('!i', status[0]))
+            s.recv(1024)
+
+            res = Info(True, status[1])
+            print(f"beat: {res.beat}, start_status: {res.is_sync}")
+            
+            my_bytes = pickle.dumps(res)
+            print(f"test {len(my_bytes)}")
+            s.sendall(struct.pack('!i', status[1]))
+            s.recv(1024)
     plot_paths(singer_sm, singer_audio, "Singer", singer_path)
     plt.show()
 
