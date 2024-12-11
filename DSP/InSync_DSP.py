@@ -29,15 +29,7 @@ import os # Run aubio command line tools
 import wave
 
 import sys # Get arguments
-from utils.util_Conversions import *
-
-# Constants for audio stream
-BUFFER_SIZE = 256  # Standard Buffer Size
-SAMPLE_RATE = 44100  # Common sample rate for audio
-PITCH_TOLERANCE = 0.8 # Required confidence of pitch value
-DEFAULT_BPM = 120 # Number of quarter-notes per minute
-AUDIO_FORMAT = pyaudio.paFloat32 # Float format of audio data
-MAX_MIDI = 108 # Highest note on a piano C8
+from Utils.util_Conversions import *
 
 # Index Constants for data tuple
 MIDI_INDEX = 0
@@ -77,10 +69,6 @@ def line_to_data(line:str):
     for i in range(len(l)):
         l[i] = round(float(l[i]), 4)
     return l
-
-def key_press_handler(key):
-    if key == 's':  # Interrupt on 's' key press
-        RECORDING = 0
 
 def find_device(name='Scarlett'):
     """
@@ -133,16 +121,14 @@ def process_file(audio_source:str):
     for line in range(len(unprocessed_data)):
         line_data = unprocessed_data[line]
         
-        # case: only one value, i.e. silence
-            # add silence note
-            # if at end (no next), ignore
-            # considers multiple silences stacked
+        # Silence detected, if at end (no next), ignore
         if(len(line_data) == 1):
             curr_midi = 0
             curr_start = line_data[0]
-
+            
+            #last line of the output, ignore silence
             if(line == len(unprocessed_data)-1): 
-                break #last line of the output, ignore silence
+                break
             else:
                 # find previous ending
                 prev_end = 0
@@ -158,8 +144,7 @@ def process_file(audio_source:str):
                             if(len(prev_data) == 3):
                                 prev_end = prev_data[STOP_INDEX]
 
-                # find next start, if none exists (multiple ending silence 
-                # values or last value), ignore
+                # Find next start, if none exists ignore
                 next_line_data = unprocessed_data[line+1]
                 if(len(next_line_data) == 3):
                     next_midi, next_start, next_end = next_line_data
@@ -184,25 +169,17 @@ def process_file(audio_source:str):
                             else:
                                 temp_data = [curr_midi, curr_start, duration]
                                 processed_note_data.append(temp_data)
-
-
-        
         elif(len(line_data) == 3):
             curr_midi, curr_start, curr_end = line_data
             temp_data = [curr_midi, curr_start, curr_end-curr_start]
 
-            # case: value outside threshold
-            # attempt to append to next note
-                # midi = next_midi
-                # start = curr_start
-                # duration = next_end - curr_start
+            # Value outside threshold, attempt to append to next note
             if(curr_midi > MAX_MIDI and line != len(unprocessed_data)-1):
                 next_line_data = unprocessed_data[line+1]
 
                 if(len(next_line_data) == 3):
                     next_midi, next_start, next_end = next_line_data
                     temp_data = [next_midi, curr_start, next_end-curr_start]
-                
                 else: #Next value is silence
                     pass
 
@@ -348,20 +325,15 @@ for arg in sys.argv[1:]:
 
 if RECORDING:
     device_index = find_device()
-    record_audio(RECORDING_PREFIX, device_index)
-    
+    record_audio(RECORDING_PREFIX, device_index)   
 else:
     process_file(FILENAME_TO_PROCESS)
 
 # TODO:
-# Set up single input scarlett input for singer microphone
 # Set up stereo input scarlett input for piano microphones
 # Record both seperately into two files
     # Files need to have a naming convention
     # Have multiple channel inputs
 # From each file run Aubio notes to generate output
-    # Filter out noise
-        # Appened spikes to next note
     # Check for articulations
     # Attempt chord handling
-    # Clean up and save in data folder
