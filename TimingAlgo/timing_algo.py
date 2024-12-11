@@ -139,7 +139,7 @@ def timing_algo(sheet_music_path, audio_data_paths):
 
     tmp = []
     for val in singer_audio:
-        tmp.append((val[0], val[1] + .5, val[2]))
+        tmp.append((val[0], val[1], val[2]))
     singer_audio = tmp
 
     # Process paths
@@ -153,21 +153,23 @@ def timing_algo(sheet_music_path, audio_data_paths):
     shared_notes = find_simultaneous_notes(singer_sm, piano_sm)
     min_cost, best_weights = float('inf'), None
 
-    '''from itertools import product
+    from itertools import product
     for w1, w2, w3 in product(range(1, 10), range(1, 10), range(1, 10)):
-        weights = [w1, w2, w3]
+        weights1 = [w1, w2, w3]
+        for w11, w21, w31 in product(range(1, 10), range(1, 10), range(1, 10)):
+            weights2 = [w11, w21, w31]
 
-        delays, new_path = find_out_of_sync(shared_notes, dict(singer_path), dict(piano_path), singer_audio, piano_audio, tempo)
+            delays, new_path = find_out_of_sync(shared_notes, dict(singer_path), dict(piano_path), singer_audio, piano_audio, tempo)
 
-        _, singer_path = process(singer_sm, singer_audio, weights=weights)
+            _, singer_path = process(singer_sm, singer_audio, weights=weights1)
 
-        _, piano_path = process(piano_sm, piano_audio, weights=weights)
+            _, piano_path = process(piano_sm, piano_audio, weights=weights2)
 
 
-        if len(delays) < min_cost:
-            min_cost, best_weights = len(delays), weights, 
+            if len(delays) < min_cost:
+                min_cost, best_weights = len(delays), [weights1, weights2], 
 
-    print(f"Best Weights: {best_weights}, Minimum Cost: {min_cost}")'''
+    print(f"Best Weights: {best_weights}, Minimum Cost: {min_cost}")
 
 
 
