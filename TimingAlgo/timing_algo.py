@@ -7,9 +7,15 @@ import matplotlib.pyplot as plt
 from parse_musicxml import parse_musicxml_file
 from processing import *
 from music21 import note
-
-
+import socket
+import struct
+import pickle
 # Plot Functions
+class Info:
+    def __init__(self,is_sync, beat):
+        self.is_sync = is_sync
+        self.beat = beat
+
 def plot_music(sheet_data, audio_data, part): 
     plt.figure(figsize=(10, 6))
 
@@ -177,6 +183,27 @@ def timing_algo(sheet_music_path, audio_data_paths):
 
     delays = remove_duplicate_paths(delays)
 
+    HOST = "127.0.0.1"  # Standard loopback interface address (localhost)
+    PORT = 65432  # Port to listen on (non-privileged ports are > 1023)
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.connect((HOST, PORT))
+        for status in delays:
+        
+            res = Info(False, status[0])
+            print(f"beat: {res.beat}, start_status: {res.is_sync}")
+            
+            my_bytes = pickle.dumps(res)
+            print(f"test {len(my_bytes)}")
+            s.sendall(struct.pack('!i', status[0]))
+            s.recv(1024)
+
+            res = Info(True, status[1])
+            print(f"beat: {res.beat}, start_status: {res.is_sync}")
+            
+            my_bytes = pickle.dumps(res)
+            print(f"test {len(my_bytes)}")
+            s.sendall(struct.pack('!i', status[1]))
+            s.recv(1024)
     print(len(shared_notes))
     print(len(delays))
 
