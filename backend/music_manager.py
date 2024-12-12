@@ -237,8 +237,9 @@ class MusicManager():
         self.last_recieved_beat = -1
         #parse beats/durations of notes
 
-    def set_sync_status(self,beat, sync_status):
-        #In this case we should start measuring 
+    def set_sync_status(self,beat, sync_status, severity):
+        #In this case we should start measuring
+        self.severity = severity
         if(self.in_sync and not sync_status):
             print(f"setting sync at beat {beat}")
             self.in_sync = False
@@ -262,8 +263,10 @@ class MusicManager():
                         x, y, x2, y2 = singer[start_t][0],  int(singer[start_t][1]), singer[i - 1][0] + 140 , int(singer[i - 1][3])
                         sub_img = image[y:y2, x:x2]
                         yellow_rect = np.zeros_like(sub_img, dtype=np.uint8)
-                        yellow_rect[:] = [0, 255, 255]  # Yellow color in BGR format (Blue, Green, Red)
-                      
+                        if(severity == 0):
+                            yellow_rect[:] = [0, 0, 255]  # Yellow color in BGR format (Blue, Green, Red)
+                        else:
+                            yellow_rect[:] = [0, 255, 255]
                         res = cv2.addWeighted(sub_img, 0.5, yellow_rect, 0.5, 1.0)
                         image[y:y2, x:x2] = res
                         start_t = i
@@ -281,7 +284,10 @@ class MusicManager():
                 if(x < x2):
                     sub_img = image[y:y2, x:x2]
                     yellow_rect = np.zeros_like(sub_img, dtype=np.uint8)
-                    yellow_rect[:] = [0, 255, 255]  # Yellow color in BGR format (Blue, Green, Red)
+                    if(severity == 0):
+                            yellow_rect[:] = [0, 0, 255]  # Yellow color in BGR format (Blue, Green, Red)
+                    else:
+                        yellow_rect[:] = [0, 255, 255]
                     res = cv2.addWeighted(sub_img, 0.5, yellow_rect, 0.5, 1.0)
                     image[y:y2, x: x2] = res
                 
