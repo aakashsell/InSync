@@ -7,15 +7,9 @@ import matplotlib.pyplot as plt
 from parse_musicxml import parse_musicxml_file
 from processing import *
 from music21 import note
-import socket
-import struct
-import pickle
-# Plot Functions
-class Info:
-    def __init__(self,is_sync, beat):
-        self.is_sync = is_sync
-        self.beat = beat
 
+
+# Plot Functions
 def plot_music(sheet_data, audio_data, part): 
     plt.figure(figsize=(10, 6))
 
@@ -41,12 +35,12 @@ def plot_paths(sheet_data, audio_data, part, matching_paths):
     # Plot sheet music data
     for idx, (pitch, onset, duration) in enumerate(sheet_data):
         plt.plot([onset, onset + duration], [pitch, pitch], color='blue', marker='o', markersize=5, 
-                 label="Sheet Music" if idx == 0 else "")
+                 label="singer" if idx == 0 else "")
 
     # Plot audio data
     for idx, (pitch, onset, duration) in enumerate(audio_data):
         plt.plot([onset, onset + duration], [pitch, pitch], color='red', marker='o', markersize=5, 
-                 label="Audio Data" if idx == 0 else "")
+                 label="piano" if idx == 0 else "")
 
     # Plot matching paths
     for i, j in matching_paths:
@@ -65,13 +59,14 @@ def parse_audio(file_path):
     with open(file_path, mode='r') as file:
         lines = file.readlines()
 
+    start = float(lines[0].strip())
     data = []
 
     for line in lines[1:]:
         line_data = line.split()
         if len(line_data) == 3:
             pitch = int(float(line_data[0]))
-            onset = float(line_data[1])
+            onset = float(line_data[1]) - start
             duration = float(line_data[2]) - float(line_data[1])
             data.append((pitch, onset, duration))
     
@@ -85,7 +80,6 @@ def seconds_to_beats(seconds, tempo):
 def find_out_of_sync(shared_notes, singer_map, piano_map, singer_audio, piano_audio, tempo, thres=0.15):
     delays = []
     delay_path = []
-    tmp = 0
 
     for s_idx, p_idx in shared_notes:
         if s_idx in singer_map and p_idx in piano_map:
@@ -94,8 +88,6 @@ def find_out_of_sync(shared_notes, singer_map, piano_map, singer_audio, piano_au
             diff = singer_note[1] - piano_note[1]
 
             if diff > thres:
-                if diff < .52 and diff > .48:
-                    tmp += 1
                 first_beat = seconds_to_beats(singer_note[1], tempo)
                 second_beat = first_beat + seconds_to_beats(diff, tempo)
                 delays.append((first_beat, second_beat))
@@ -143,14 +135,15 @@ def timing_algo(sheet_music_path, audio_data_paths):
     singer_audio = parse_audio(audio_data_paths[0])
     piano_audio = parse_audio(audio_data_paths[1])
 
+
     tmp = []
     for val in singer_audio:
-        tmp.append((val[0], val[1], val[2]))
+        tmp.append((val[0] - 12, val[1] + .5, val[2]))
     singer_audio = tmp
 
     # Process paths
-    _, singer_path = process(singer_sm, singer_audio, [1,3,2])
-    _, piano_path = process(piano_sm, piano_audio, [1,3,2])
+    _, singer_path = process(singer_sm, singer_audio, [1,4,3])
+    _, piano_path = process(piano_sm, piano_audio, [1,4,3])
 
     singer_path = remove_duplicate_paths(singer_path)
     piano_path = remove_duplicate_paths(piano_path)
@@ -159,23 +152,22 @@ def timing_algo(sheet_music_path, audio_data_paths):
     shared_notes = find_simultaneous_notes(singer_sm, piano_sm)
     min_cost, best_weights = float('inf'), None
 
-    from itertools import product
-    for w1, w2, w3 in product(range(1, 10), range(1, 10), range(1, 10)):
-        weights1 = [w1, w2, w3]
-        for w11, w21, w31 in product(range(1, 10), range(1, 10), range(1, 10)):
-            weights2 = [w11, w21, w31]
-
-            delays, new_path = find_out_of_sync(shared_notes, dict(singer_path), dict(piano_path), singer_audio, piano_audio, tempo)
-
-            _, singer_path = process(singer_sm, singer_audio, weights=weights1)
-
-            _, piano_path = process(piano_sm, piano_audio, weights=weights2)
+    '''from itertools import product
+    for w1, w2, w3 in product(range(1, 5), range(1, 5), range(1, 5)):
+        weights = [w1, w2, w3]
 
 
-            if len(delays) < min_cost:
-                min_cost, best_weights = len(delays), [weights1, weights2], 
+        _, singer_path = process(singer_sm, singer_audio, weights=weights)
 
-    print(f"Best Weights: {best_weights}, Minimum Cost: {min_cost}")
+        _, piano_path = process(piano_sm, piano_audio, weights=weights)
+        delays, new_path = find_out_of_sync(shared_notes, dict(singer_path), dict(piano_path), singer_audio, piano_audio, tempo)
+
+
+        if len(delays) < min_cost:
+            min_cost, best_weights = len(delays), weights, 
+
+    print(f"Best Weights: {best_weights}, Delays: {min_cost}")'''
+
 
 
 
@@ -183,37 +175,70 @@ def timing_algo(sheet_music_path, audio_data_paths):
 
     delays = remove_duplicate_paths(delays)
 
-    HOST = "127.0.0.1"  # Standard loopback interface address (localhost)
-    PORT = 65432  # Port to listen on (non-privileged ports are > 1023)
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.connect((HOST, PORT))
-        for status in delays:
-        
-            res = Info(False, status[0])
-            print(f"beat: {res.beat}, start_status: {res.is_sync}")
-            
-            my_bytes = pickle.dumps(res)
-            print(f"test {len(my_bytes)}")
-            s.sendall(struct.pack('!i', status[0]))
-            s.recv(1024)
+    print(singer_sm)
+    print(singer_audio)
 
-            res = Info(True, status[1])
-            print(f"beat: {res.beat}, start_status: {res.is_sync}")
-            
-            my_bytes = pickle.dumps(res)
-            print(f"test {len(my_bytes)}")
-            s.sendall(struct.pack('!i', status[1]))
-            s.recv(1024)
-    print(len(shared_notes))
-    print(len(delays))
+
+    print()
+    print()
+    print()
+    print()
+    print()
+    print()
+    print()
+    print()
+    print()
+    print()
+    print()
+    print()
+    print()
+    print()
+    print()
+    print()
+    print()
+    print()
+    print()
+    print()
+    print()
+    print()
+    print()
+    print()
+    print()
+    print()
+    print()
+    print()
+    print()
+    print()
+    print()
+
+    #print(len(delays))
+    #print(len(shared_notes))
+    print("singer data:")
+    print("sheet music:")
+    for i in range(3):
+        print(singer_sm[i])
+    print()
+    print("audio:")
+    for i in range(3):
+        print(singer_audio[i])
+    print()
+    print("align both")
+    for i in range(3):
+        print(singer_path[i])
+
+
+    print()
+    print()
+    print("delays:")
+
+
+    for i in range(3):
+        print(delays[i])
 
     #plot_paths(singer_audio, piano_audio, "both", new_path)
     #plot_paths(singer_sm, singer_audio, "singer", singer_path)
     #plot_paths(piano_sm, piano_audio, "piano", piano_path)
     #plt.show()
-
-
-    print(delays)
 
     return delays
 
