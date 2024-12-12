@@ -28,6 +28,10 @@ import pyaudio # Audio recording
 import os # Run aubio command line tools
 import wave
 
+from queue import Queue
+from sounddevice import InputStream
+from soundfile import SoundFile
+
 import sys # Get arguments
 from Utils.util_Conversions import *
 
@@ -70,34 +74,7 @@ def line_to_data(line:str):
         l[i] = round(float(l[i]), 4)
     return l
 
-def find_device(name='Scarlett'):
-    """
-    Searches for a Scarlett Audio Interface and returns its device index. Returns
-    default audio device of the system (typically built-in microphone) if none found.
-    The device index is used by pyaudio to select I/O
-
-    Args:
-        name (str): Name of audio device to be found. Defaults to "Scarlett"
-
-    Returns:
-        int: Index used to access the audio device with pyaudio
-    """
-    p = pyaudio.PyAudio()
-    # Iterate through all available devices
-    for i in range(p.get_device_count()):
-        device_info = p.get_device_info_by_index(i)
-        device_name = device_info.get('name')
-
-        # Check if the device name contains name provided
-        # In our case this defaults to 'Scarlett'
-        if name in device_name:
-            print("Found Device: ", device_name)
-            p.terminate()
-            return i
-    p.terminate()
-    return 0
-
-def process_file(audio_source:str):
+def process_file(audio_source:str, silence_threshold:int=-55, onset_type:str="hfc"):
     """
         Converts a wav file given as the audio source into a data stream of tuples
         containing the detected pitch (midi value), its time of onset, and its approximate duration.
@@ -108,8 +85,14 @@ def process_file(audio_source:str):
         Returns:
             None
     """
-    destination = "temp.out"
-    os.system("aubio notes " + audio_source + " -s -55 " +" > " + destination)
+    destination = "./Outputs/temp.out"
+
+    source = "aubio notes " + audio_source
+    silence = " -s " + silence_threshold
+    onset = " -o " + onset_type # Change for polyphonic onsets
+    output = " > " + destination
+
+    os.system(source + silence + onset + destination)
     f = open(destination,'r') #read data from destination file  
     
     unprocessed_data = []
@@ -192,7 +175,7 @@ def process_file(audio_source:str):
         start_time_ofset = processed_note_data[0][DURATION_INDEX]
         processed_note_data = processed_note_data[1:]
     
-    processed_data_out = open("modfied.out", 'w')
+    processed_data_out = open("./Outputs/modfied.out", 'w')
     for note in processed_note_data:
         note[ONSET_INDEX] = note[ONSET_INDEX] - start_time_ofset
         line = data_to_line(note[MIDI_INDEX], note[ONSET_INDEX], note[DURATION_INDEX])
@@ -202,132 +185,139 @@ def process_file(audio_source:str):
             pitch = aubio.midi2note(int(float(pitch)))
             print(f"({pitch},{start},{duration})")
     processed_data_out.close()
-                   
-def record_audio(filename:str, audio_interface_index:int, num_channels:int=1):
+
+def find_device(name:str):
     """
-        Records an audio stream into a .wav file created from the file name given.
-        Then processes the audio file into an output file.
+    Searches for a Scarlett Audio Interface and returns its device index. Returns
+    default audio device of the system (typically built-in microphone) if none found.
+    The device index is used by pyaudio to select I/O
 
-        Args:
-            filename (str): Name of the produced .wav file -> filename.wav
-            audio_interface_index (int): Audio interface to record from
-            num_channels (int): Number of input channels to record from the audio interface
+    Args:
+        name (str): Name of audio device to be found. Returns first index if
+        multiple found.
+
+    Returns:
+        int: Index used to access the audio device with pyaudio. Returns -1 if
+        not found.
     """
-    
-    # initialise pyaudio
-    audio_data = pyaudio.PyAudio()
-    audio_interface_index = find_device()
+    p = pyaudio.PyAudio()
+    # Iterate through all available devices
+    for i in range(p.get_device_count()):
+        device_info = p.get_device_info_by_index(i)
+        device_name = device_info.get('name')
 
-    # open stream
-    stream = audio_data.open(format=AUDIO_FORMAT,
-                    channels=num_channels,
-                    rate=SAMPLE_RATE,
-                    input=True,
-                    output=True,
-                    frames_per_buffer=BUFFER_SIZE,
-                    input_device_index=audio_interface_index)
+        # Check if the device name contains name provided
+        if name in device_name:
+            print("Found Device: ", device_name)
+            p.terminate()
+            return i
+    p.terminate()
+    return -1
 
-    outputsink = aubio.sink(filename, SAMPLE_RATE) 
+def file_writing_thread(*, q, **soundfile_args):
+    # Write data from queue to file until *None* is received
+    with SoundFile(**soundfile_args) as f:
+        while True:
+            data = q.get()
+            if data is None:
+                break
+            f.write(data)
 
-    # setup pitch
-    win_s = 4096 # fft size
-    hop_s = BUFFER_SIZE # hop size
+def record_device(device_id:int, channels:int, piece:str):
+    def audio_callback(data, frames, time, status):
+        # Called for each audio block per thread
+        if status:
+            print(status, file=sys.stderr)
+        audio_q.put(data.copy())
 
-    # Create Aubio objects for detection
-    aub_pitch = aubio.pitch("default", win_s, hop_s, SAMPLE_RATE)
-    aub_onset = aubio.onset("default", win_s, hop_s, SAMPLE_RATE)
+    file_name = join(rec_dir, f"rec_dev{piece}.wav")
 
-    aub_pitch.set_unit("midi")
-    aub_pitch.set_tolerance(PITCH_TOLERANCE)
+    stream = InputStream(
+        samplerate=SAMPLE_RATE, 
+        device=device_id, 
+        channels=channels, 
+        callback=audio_callback
+    )
+    stream.start()
+    print(f"started stream {stream} ...")
 
-    #use "phase" Method for polyphonic onset
+    audio_q = Queue()
+    print(f"generated queue {audio_q} ...")
 
-    print("*** Starting Recording ***")
+    thread = Thread(
+        target=file_writing_thread,
+        kwargs=dict(
+            file=file_name,
+            mode="w",
+            samplerate=int(stream.samplerate),
+            channels=stream.channels,
+            q=audio_q,
+        ),
+    )
+    thread.start()
     if VERBOSE_MODE:
-        print("Recording to \"Recordings/" + filename)
-    
-    wav_data = []
-    
-    while RECORDING:
+        print(f"started thread {thread} ...")
+        print(f'recording file "{file_name}" ...')
+        print("#" * 40)
+
+if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Initializing InSync...")
+    parser.add_argument("-f","--filename", help="Path of file to process. Does not record audio")
+    parser.add_argument("-b","--bpm", help="The bpm of the piece")
+    parser.add_argument("-p","--piece", help="Name of the piece used to label recordings")
+    parser.add_argument("-v","--verbose", help="Provides verbose output during recording", action='store_false')
+
+    args = parser.parse_args()
+
+    FILENAME_TO_PROCESS = "" # Filename of audiofile to process
+    NAME_OF_PIECE = "" # Name of music piece to add into recording filename
+
+    if len(sys.argv) < 1:
+        print("Please provide the name of the music piece (-p) to record or a \
+        filename (-f) to process.")
+        sys.exit(1)
+
+    for arg in sys.argv[1:]:
+        if arg == '-f':
+            if RECORDING != -1:
+                print("Cannot process a file and record at the same time")
+                sys.exit()
+            RECORDING = 0
+            FILENAME_TO_PROCESS = args.filename
+        elif arg == '-b':
+            DEFAULT_BPM = int(args.bpm)
+        elif arg == "-p":
+            if RECORDING != -1:
+                print("Cannot record and process a file at the same time")
+                sys.exit()
+            RECORDING = 1
+            NAME_OF_PIECE = args.piece
+        elif arg == "-v":
+            VERBOSE_MODE = True
+
+    if RECORDING:
+        record_audio(NAME_OF_PIECE, device_index)
+        rec_dir = join("./Recordings", NAME_OF_PIECE) # Pathname of .wav files
+
+        piano_id = find_device("Scarlett 2i2")
+        voice_id = find_device("Scarlett Solo")
+        
         try:
-            audiobuffer = stream.read(BUFFER_SIZE)
-            signal = np.frombuffer(audiobuffer, dtype=np.float32)
-            wav_data.append(signal)
-
-            pitch = aub_pitch(signal)[0]
-            confidence = aub_pitch.get_confidence()
-
-            onset = aub_onset(signal)[0]
-
-            if VERBOSE_MODE:
-                if onset != 0: 
-                    print(f"onset {onset}")
-                    print("{} / {}".format(pitch,confidence))
+            record_device(device_id=piano_id, channels=2, piece=rec_dir+"_piano")
+            record_device(device_id=voice_id, channels=1, piece=rec_dir+"_voice")
+            print("press Ctrl+C to stop the recording")
 
         except KeyboardInterrupt:
-            print("*** Ctrl-C Pressed, Exiting ***")
-            break
-
-    print("*** Done Recording ***")
-
-    # Clean up PyAudio
-    stream.stop_stream()
-    stream.close()
-    audio_data.terminate()
-
-    # Create WAV file
-    output_file_name = RECORDING_PREFIX + ".wav"
-    wav_file = wave.open(output_file_name, 'wb')
-    wav_file.setnchannels(num_channels)
-    wav_file.setsampwidth(audio_data.get_sample_size(AUDIO_FORMAT))
-    wav_file.setframerate(SAMPLE_RATE)
-    wav_file.writeframes(b''.join(wav_data))
-    wav_file.close()
-
-    # Run Audio Processing
-    process_file(output_file_name)
-
-import argparse
-
-parser = argparse.ArgumentParser(description="Initializing InSync...")
-parser.add_argument("-f","--filename", help="Path of file to process. Does not record audio")
-parser.add_argument("-b","--bpm", help="The bpm of the piece")
-parser.add_argument("-p","--piece", help="Name of the piece used to label recordings")
-parser.add_argument("-v","--verbose", help="Provides verbose output during recording", action='store_false')
-
-args = parser.parse_args()
-
-FILENAME_TO_PROCESS = "" # Filename of audiofile to process
-RECORDING_PREFIX = "" # Name of music piece to add into recording filename
-
-if len(sys.argv) < 1:
-    print("Please provide the name of the music piece (-p) to record or a \
-    filename (-f) to process.")
-    sys.exit(1)
-
-for arg in sys.argv[1:]:
-    if arg == '-f':
-        if RECORDING != -1:
-            print("Cannot process a file and record at the same time")
-            sys.exit()
-        RECORDING = 0
-        FILENAME_TO_PROCESS = args.filename
-    elif arg == '-b':
-        DEFAULT_BPM = int(args.bpm)
-    elif arg == "-p":
-        if RECORDING != -1:
-            print("Cannot record and process a file at the same time")
-            sys.exit()
-        RECORDING = 1
-        RECORDING_PREFIX = args.piece
-    elif arg == "-v":
-        VERBOSE_MODE = True
-
-if RECORDING:
-    device_index = find_device()
-    record_audio(RECORDING_PREFIX, device_index)   
-else:
-    process_file(FILENAME_TO_PROCESS)
+            print("*** Ctrl-C Pressed, Ending Recording ***")
+            process_file(rec_dir+"_piano.wav")
+            process_file(rec_dir+"_voice.wav")
+        except Exception as e:
+            exit(type(e).__name__ + ": " + str(e)) 
+    
+    else:
+        process_file(FILENAME_TO_PROCESS)
 
 # TODO:
 # Set up stereo input scarlett input for piano microphones
