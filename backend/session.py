@@ -13,6 +13,7 @@ HOST = "127.0.0.1"  # Standard loopback interface address (localhost)
 PORT = 65432  # Port to listen on (non-privileged ports are > 1023)
 
 def create_and_handle_session(sheet_path, music_xml_path,image_path, voice_path, piano_path):
+    
     manager = MusicManager(sheet_path,music_xml_path,image_path)
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         
@@ -23,6 +24,7 @@ def create_and_handle_session(sheet_path, music_xml_path,image_path, voice_path,
         conn, addr = s.accept()
         #s.sendall
         count = 0
+        severity = 0
         while True:
             data = conn.recv(4)
             print("buf len", len(data))
@@ -31,10 +33,12 @@ def create_and_handle_session(sheet_path, music_xml_path,image_path, voice_path,
             received_int = struct.unpack('!i', data)[0] 
             
             #restored_obj = pickle.loads(data)
-            if(count%2 == 0):
-                manager.set_sync_status(received_int,False)
+            if(count%3 == 0):
+                severity = received_int
+            if(count%3 == 1):
+                manager.set_sync_status(received_int,False,severity)
             else:
-                manager.set_sync_status(received_int,True)
+                manager.set_sync_status(received_int,True,severity)
             count += 1
             conn.sendall(data)
         manager.done()
