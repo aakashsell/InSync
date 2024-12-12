@@ -29,13 +29,14 @@ import os # Run aubio command line tools
 import wave
 
 import sys # Get arguments
-from Utils.util_Conversions import *
+from utils .util_Conversions import *
 
 # Index Constants for data tuple
 MIDI_INDEX = 0
 ONSET_INDEX = 1
 DURATION_INDEX = 2
 STOP_INDEX = 2
+MAX_MIDI = 200
 
 # Global Semaphore 
 VERBOSE_MODE = False # If enabled, print information while recording

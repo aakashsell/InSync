@@ -139,8 +139,8 @@ def parse_musicxml_file(file_path, tempo=60):
                         # Increment Onset Time
                         onset_time2 += duration_in_seconds
 
-        #tmp1.extend(tmp2)
-        #tmp1 = sorted(tmp1, key=lambda x: x[1])
+        tmp1.extend(tmp2)
+        tmp1 = sorted(tmp1, key=lambda x: x[1])
 
         data[part_id].extend(tmp1)
 
