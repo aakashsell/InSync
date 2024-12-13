@@ -188,7 +188,7 @@ def done_song():
     p.join()
     prefixed = [filename for filename in os.listdir('.') if filename.startswith("result")]
     curr = datetime.now()
-    print(prefixed)
+    print(prefixed.sort())
     os.mkdir(f"{RESULTS}/{song_name}{curr.strftime("%d%m_%Y_%H:%M:%S")}")
     for pre in prefixed:
         shutil.move(f"./{pre}",f"{RESULTS}/{song_name}{curr.strftime("%d%m_%Y_%H:%M:%S")}" )

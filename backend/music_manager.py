@@ -84,6 +84,7 @@ def make_lists_count(sheet_path, music_xml_path, image_path,prev_beats,count,cou
             #print("hi")
             for note in notes:
                 #print(note.attrib)
+                '''
                 x_pos = int(note.attrib['default-x'])
                 #Some notes are stacked on each other so we can ignore
                 if(x_pos  <= prev_note_x +0 and x_pos >= prev_note_x - 0):
@@ -94,6 +95,7 @@ def make_lists_count(sheet_path, music_xml_path, image_path,prev_beats,count,cou
                     for note in measure_list:
                         beat_list_pianist_l.append(note)
                     measure_list = list()
+                '''
                 res=  note.find('duration')
                 if(res is not None):
                     measure_list.append((int(note.find('duration').text)/divisions) * magnifier)
@@ -157,10 +159,7 @@ def make_lists_count(sheet_path, music_xml_path, image_path,prev_beats,count,cou
             bounds = head.find('bounds').attrib
             if(int(bounds['y']) < brace_y - brace_height/3):
                 listsing_.append((int(bounds['x']),poistions[0][0],poistions[0][1] ))
-            elif(int(bounds['y']) < brace_y + brace_height/2):
-                list_piano_1.append((int(bounds['x']),poistions[1][0], poistions[1][1]))
-            else:
-                list_piano_2.append((int(bounds['x']),poistions[2][0], poistions[2][1]))
+          
             #print(int(bounds['x']))
             #cv2.rectangle(template, (int(bounds['x']), int(bounds['y'])), 
                         #(int(bounds['x']) + 5, int(bounds['y']) + 5),(0, 0, 255), 2)
@@ -200,7 +199,7 @@ def make_lists_count(sheet_path, music_xml_path, image_path,prev_beats,count,cou
         '''
         
      #print(f"singer_list {len(singer_list)} beat_list {len(beat_list_singer)}")
-     #print(singer_list)
+     print(singer_list)
      print("\n\n\n\n\n\n\n\n")
      print(f" beat singer{piano_list_l} len{len(beat_list_singer)}")
      print("\n\n\n\n\n\n\n\n")

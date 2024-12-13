@@ -10,7 +10,7 @@ class Info:
         self.beat = beat
 
 HOST = "127.0.0.1"  # Standard loopback interface address (localhost)
-PORT = 65431  # Port to listen on (non-privileged ports are > 1023)
+PORT = 65434  # Port to listen on (non-privileged ports are > 1023)
 
 def create_and_handle_session(sheet_path, music_xml_path,image_path, voice_path, piano_path, bpm):
     
