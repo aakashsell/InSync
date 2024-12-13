@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import JSZip from 'jszip';
+import { useNavigate } from 'react-router-dom'; // Import useNavigate hook for navigation
 
 function ViewResults() {
   const [results, setResults] = useState([]); // State for result options
@@ -8,6 +9,7 @@ function ViewResults() {
   const [error, setError] = useState(null); // Error state
   const [images, setImages] = useState([]); // State for extracted images
   const [submissionMessage, setSubmissionMessage] = useState(''); // Message after submission
+  const navigate = useNavigate(); // Initialize the navigate function
 
   // Fetch results from an API or server
   useEffect(() => {
@@ -47,7 +49,7 @@ function ViewResults() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body:  selectedResult,
+        body: selectedResult,
       });
 
       if (!response.ok) {
@@ -73,6 +75,11 @@ function ViewResults() {
     } catch (error) {
       setSubmissionMessage('Error during submission: ' + error.message);
     }
+  };
+
+  // Handle navigation back to the home page
+  const handleBackToHome = () => {
+    navigate('/'); // Navigate back to the home page
   };
 
   return (
@@ -139,6 +146,24 @@ function ViewResults() {
           </div>
         </div>
       )}
+
+      {/* Back to Home Button */}
+      <div style={{ marginTop: '20px' }}>
+        <button
+          onClick={handleBackToHome}
+          style={{
+            padding: '10px 20px',
+            backgroundColor: '#2196F3',
+            color: 'white',
+            border: 'none',
+            cursor: 'pointer',
+            borderRadius: '5px',
+            marginLeft: '10px',
+          }}
+        >
+          Back to Home
+        </button>
+      </div>
     </div>
   );
 }
