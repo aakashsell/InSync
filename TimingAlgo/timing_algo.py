@@ -8,7 +8,6 @@ from parse_musicxml import parse_musicxml_file
 from processing import *
 from music21 import note
 import socket, struct
-import mpld3
 
 
 # Plot Functions
@@ -32,12 +31,17 @@ def plot_music(sheet_data, audio_data, part):
     plt.tight_layout()
 
 
-def plot_paths(sheet_data, audio_data, part, matching_paths):
+def plot_paths(sheet_data, audio_data, part, matching_paths, singer_sm):
     plt.figure(figsize=(10, 6))
     # Plot sheet music data
     for idx, (pitch, onset, duration) in enumerate(sheet_data):
         plt.plot([onset, onset + duration], [pitch, pitch], color='blue', marker='o', markersize=5, 
                  label="singer" if idx == 0 else "")
+        
+     # Plot audio data
+    for idx, (pitch, onset, duration) in enumerate(singer_sm):
+        plt.plot([onset, onset + duration], [pitch, pitch], color='green', marker='o', markersize=5, 
+                 label="singer_correct" if idx == 0 else "")
 
     # Plot audio data
     for idx, (pitch, onset, duration) in enumerate(audio_data):
@@ -68,7 +72,7 @@ def parse_audio(file_path):
         if len(line_data) == 3:
             pitch = int(float(line_data[0]))
             onset = float(line_data[1]) 
-            duration = float(line_data[2]) - float(line_data[1])
+            duration = float(line_data[2 ])
             data.append((pitch, onset, duration))
     
     return data
@@ -81,7 +85,7 @@ def seconds_to_beats(seconds, tempo):
 def find_out_of_sync(shared_notes, singer_map, piano_map, singer_audio, piano_audio, tempo, thres=0.15):
     delays = []
     delay_path = []
-
+    sev = -1
     for s_idx, p_idx in shared_notes:
         if s_idx in singer_map and p_idx in piano_map:
             singer_note = singer_audio[singer_map[s_idx]]
@@ -94,6 +98,8 @@ def find_out_of_sync(shared_notes, singer_map, piano_map, singer_audio, piano_au
                     sev = 1
                 first_beat = seconds_to_beats(singer_note[1], tempo)
                 second_beat = first_beat + seconds_to_beats(diff, tempo)
+                if first_beat == second_beat:
+                    second_beat += 1
                 delays.append((first_beat, second_beat, sev))
                 delay_path.append((singer_map[s_idx], piano_map[p_idx]))
 
@@ -127,6 +133,8 @@ def remove_duplicate_paths(path):
 
 # Main Algorithm
 def timing_algo(sheet_music_path, audio_data_paths, bpm=110):
+    demo = 1
+
     parts_data = parse_musicxml_file(sheet_music_path, bpm)
     tempo = parts_data[1]
 
@@ -137,13 +145,26 @@ def timing_algo(sheet_music_path, audio_data_paths, bpm=110):
 
     # Parse audio data
     singer_audio = parse_audio(audio_data_paths[0])
-    piano_audio = parse_audio(audio_data_paths[1])
+    
+    if demo:
+        piano_audio = piano_sm
+    else:
+        piano_audio = parse_audio(audio_data_paths[1])
 
 
     tmp = []
     for val in singer_audio:
-        tmp.append((val[0] - 12, val[1], val[2]))
+        tmp.append((val[0], val[1], val[2]))
     singer_audio = tmp
+
+    last_time = singer_audio[-1][1]
+
+
+    get_rid = []
+    for val in singer_sm:
+        if val[1] <= last_time:
+            get_rid.append(val)
+    singer_sm = get_rid
 
     # Process paths
     _, singer_path = process(singer_sm, singer_audio, [1,4,3])
@@ -180,21 +201,19 @@ def timing_algo(sheet_music_path, audio_data_paths, bpm=110):
 
 
     delays = remove_duplicate_paths(delays)
-
-    plot_paths(singer_audio, piano_audio, "both", new_path)
+    print("delays",delays)
+    plot_paths(singer_audio, piano_audio, "both", new_path, singer_sm)
     #plot_paths(singer_sm, singer_audio, "singer", singer_path)
     #plot_paths(piano_sm, piano_audio, "piano", piano_path)
     #plt.show()
 
-    html_plot = mpld3.fig_to_html(plt.gcf())
-    print(html_plot)
-    with open('plot.html', 'w') as file:
-        file.write(html_plot)
+
+   
 
 
 
     HOST = "127.0.0.1"  # Standard loopback interface address (localhost)
-    PORT = 65431  # Port to listen on (non-privileged ports are > 1023)
+    PORT = 65435  # Port to listen on (non-privileged ports are > 1023)
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.connect((HOST, PORT))
         for status in delays:
@@ -213,6 +232,10 @@ def timing_algo(sheet_music_path, audio_data_paths, bpm=110):
             
             s.sendall(struct.pack('!i', status[1]))
             s.recv(1024)
+        
+    print(singer_audio)
+    
+    plt.show()
 
     return delays
 

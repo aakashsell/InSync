@@ -10,6 +10,8 @@ import shutil
 import zipfile
 import json
 from datetime import datetime
+import signal
+import time
 app = Flask(__name__)
 UPLOAD_FOLDER = './upload_folder'
 RESULTS = './fresults'
@@ -149,16 +151,20 @@ def done_song():
     print(song_name)
     data_path = os.path.join(app.config['UPLOAD_FOLDER'], song_name)
     #Commenting out for now since just testing done
-    '''
+    
     global super_dict
     process = super_dict[song_name]
-    process.kill()
-    shutil.move(../DSP/modfied.out, ./)
-    '''
+    process.send_signal(signal.SIGINT)
+    #os.remove('./modfied_voice.out')
+    #os.remove('./modfied_piano.out')
+    time.sleep(15)
+    shutil.move('../DSP/Outputs/modfied_voice.out', './')
+    shutil.move('../DSP/Outputs/modfied_piano.out', './')
+    
     #TODO save a pre-done piano file
 
     piano_file =  os.getcwd() + "/piano.out"
-    singer_file = os.getcwd() + "/modfied.out"
+    singer_file = os.getcwd() + "/modfied_voice.out"
     music_path = ""
     sheets = []
     images = []
@@ -207,6 +213,9 @@ def done_song():
 
 def _corsify_actual_response(response):
     response.headers.add("Access-Control-Allow-Origin", "*")
+    response.headers.add("Access-Control-Allow-Origin", "*")
+    response.headers.add('Access-Control-Allow-Headers', "*")
+    response.headers.add('Access-Control-Allow-Methods', "*")
     return response
 @app.route('/get_all_songs', methods=['GET', 'OPTIONS'])
 def get_all_songs():
