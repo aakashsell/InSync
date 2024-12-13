@@ -29,7 +29,8 @@ import os # Run aubio command line tools
 import wave
 
 import sys # Get arguments
-from utils .util_Conversions import *
+from utils.util_Conversions import *
+from utils.util_Constants import * 
 
 # Index Constants for data tuple
 MIDI_INDEX = 0
@@ -41,6 +42,7 @@ MAX_MIDI = 200
 # Global Semaphore 
 VERBOSE_MODE = False # If enabled, print information while recording
 RECORDING = -1 # Set to 1 if a piece is being recorded
+AUDIO_FORMAT = pyaudio.paFloat32
 
 def data_to_line(midi:float, onset:float, duration:float):
     """

@@ -59,14 +59,14 @@ def parse_audio(file_path):
     with open(file_path, mode='r') as file:
         lines = file.readlines()
 
-    start = float(lines[0].strip())
+   
     data = []
 
-    for line in lines[1:]:
+    for line in lines[0:]:
         line_data = line.split()
         if len(line_data) == 3:
             pitch = int(float(line_data[0]))
-            onset = float(line_data[1]) - start
+            onset = float(line_data[1]) 
             duration = float(line_data[2]) - float(line_data[1])
             data.append((pitch, onset, duration))
     
@@ -80,6 +80,7 @@ def seconds_to_beats(seconds, tempo):
 def find_out_of_sync(shared_notes, singer_map, piano_map, singer_audio, piano_audio, tempo, thres=0.15):
     delays = []
     delay_path = []
+    sev = 0
 
     for s_idx, p_idx in shared_notes:
         if s_idx in singer_map and p_idx in piano_map:
@@ -88,12 +89,14 @@ def find_out_of_sync(shared_notes, singer_map, piano_map, singer_audio, piano_au
             diff = singer_note[1] - piano_note[1]
 
             if diff > thres:
+                if diff > 3*thres:
+                    sev
                 first_beat = seconds_to_beats(singer_note[1], tempo)
                 second_beat = first_beat + seconds_to_beats(diff, tempo)
                 delays.append((first_beat, second_beat))
                 delay_path.append((singer_map[s_idx], piano_map[p_idx]))
 
-    return delays, delay_path
+    return delays, delay_path, sev
 
 
 def find_simultaneous_notes(notes1, notes2, time_tolerance=0.01):
@@ -122,7 +125,7 @@ def remove_duplicate_paths(path):
 
 
 # Main Algorithm
-def timing_algo(sheet_music_path, audio_data_paths):
+def timing_algo(sheet_music_path, audio_data_paths, bpm =120):
     parts_data = parse_musicxml_file(sheet_music_path, 110)
     tempo = parts_data[1]
 
@@ -138,7 +141,7 @@ def timing_algo(sheet_music_path, audio_data_paths):
 
     tmp = []
     for val in singer_audio:
-        tmp.append((val[0] - 12, val[1] + .5, val[2]))
+        tmp.append((val[0] - 12, val[1], val[2]))
     singer_audio = tmp
 
     # Process paths
@@ -171,76 +174,38 @@ def timing_algo(sheet_music_path, audio_data_paths):
 
 
 
-    delays, new_path = find_out_of_sync(shared_notes, dict(singer_path), dict(piano_path), singer_audio, piano_audio, tempo)
+    delays, new_path, sev = find_out_of_sync(shared_notes, dict(singer_path), dict(piano_path), singer_audio, piano_audio, tempo)
+
+
 
     delays = remove_duplicate_paths(delays)
 
     print(singer_sm)
-    print(singer_audio)
-
-
-    print()
-    print()
-    print()
-    print()
-    print()
-    print()
-    print()
-    print()
-    print()
-    print()
-    print()
-    print()
-    print()
-    print()
-    print()
-    print()
-    print()
-    print()
-    print()
-    print()
-    print()
-    print()
-    print()
-    print()
-    print()
-    print()
-    print()
-    print()
-    print()
-    print()
-    print()
-
-    #print(len(delays))
-    #print(len(shared_notes))
-    print("singer data:")
-    print("sheet music:")
-    for i in range(3):
-        print(singer_sm[i])
-    print()
-    print("audio:")
-    for i in range(3):
-        print(singer_audio[i])
-    print()
-    print("align both")
-    for i in range(3):
-        print(singer_path[i])
-
-
-    print()
-    print()
-    print("delays:")
-
-
-    for i in range(3):
-        print(delays[i])
 
     #plot_paths(singer_audio, piano_audio, "both", new_path)
-    #plot_paths(singer_sm, singer_audio, "singer", singer_path)
+    plot_paths(singer_sm, singer_audio, "singer", singer_path)
     #plot_paths(piano_sm, piano_audio, "piano", piano_path)
-    #plt.show()
+    plt.show()
 
     return delays
+
+def test_script(sm, audio):
+    parts_data = parse_musicxml_file(sm, 110)
+    singer_sm = [(note.Note(n[0]).pitch.midi if n[0] != 'rest' else 0, n[1], n[2]) for n in parts_data[0].get('P1', [])]
+    piano_sm = [(note.Note(n[0]).pitch.midi if n[0] != 'rest' else 0, n[1], n[2]) for n in parts_data[0].get('P2', [])]
+    sm = piano_sm
+
+    audio = parse_audio(audio)
+
+
+    _, path = process(sm, audio, [0, 400, 0])
+
+        
+    
+    for line in path:
+        print(str(sm[line[0]]) + " + " + str(audio[line[1]]))
+
+
 
     
 
@@ -249,5 +214,8 @@ if __name__ == "__main__":
     sheet_music = sys.argv[1]
     voice_data = sys.argv[2]
     piano_data = sys.argv[3]
+    bpm = sys.argv[3]
     
-    timing_algo(sheet_music, [voice_data, piano_data])
+    timing_algo(sheet_music, [voice_data, piano_data], bpm)
+
+    #test_script(sheet_music, piano_data)

@@ -179,6 +179,7 @@ def make_lists_count(sheet_path, music_xml_path, image_path,prev_beats,count,cou
             count_s += 1
         
         prev_beat_l = prev_beats_l
+        '''
         for ele in list_piano_1:
             x_post = ele[0]
             if(x_post  <= prev_x +5 and x_post >= prev_x - 5 ):
@@ -196,7 +197,7 @@ def make_lists_count(sheet_path, music_xml_path, image_path,prev_beats,count,cou
             prev_beat_r += beat_list_pianist_r[count_r + count_piano_r]
             count_piano_r += 1
             prev_x = x_post
-            
+        '''
         
      #print(f"singer_list {len(singer_list)} beat_list {len(beat_list_singer)}")
      #print(singer_list)

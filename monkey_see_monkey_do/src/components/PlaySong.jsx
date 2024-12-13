@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 function PlaySong() {
   const [songs, setSongs] = useState([]); // State for song options
   const [selectedSong, setSelectedSong] = useState(''); // State for the selected song
-  const [bpm, setBpm] = useState(''); // State for BPM input
+  const [bpm, setBpm] = useState(120); // State for BPM input
   const [loading, setLoading] = useState(false); // Loading state
   const [error, setError] = useState(null); // Error state
   const [submissionMessage, setSubmissionMessage] = useState(''); // Message after submission
