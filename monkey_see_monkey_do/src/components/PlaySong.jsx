@@ -91,6 +91,7 @@ function PlaySong() {
 
       const imageUrls = [];
       for (const filename of Object.keys(zip.files)) {
+        console.log("hi")
         if (filename.endsWith('.png')) { // Process only PNG files
           const fileBlob = await zip.file(filename).async('blob'); // Extract the file as a Blob
           const url = URL.createObjectURL(fileBlob); // Create a URL for the Blob
@@ -191,7 +192,13 @@ function PlaySong() {
                 key={index}
                 src={url}
                 alt={`Extracted ${index}`}
-                style={{ maxWidth: '200px', margin: '10px' }}
+                style={{
+                  width: '400px',  // Increased width
+                  height: 'auto',  // Maintain aspect ratio
+                  margin: '10px',
+                  border: '1px solid #ccc',
+                  borderRadius: '8px',
+                }}
               />
             ))}
           </div>
