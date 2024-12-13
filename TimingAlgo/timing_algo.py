@@ -7,6 +7,8 @@ import matplotlib.pyplot as plt
 from parse_musicxml import parse_musicxml_file
 from processing import *
 from music21 import note
+import socket, struct
+import mpld3
 
 
 # Plot Functions
@@ -79,7 +81,6 @@ def seconds_to_beats(seconds, tempo):
 def find_out_of_sync(shared_notes, singer_map, piano_map, singer_audio, piano_audio, tempo, thres=0.15):
     delays = []
     delay_path = []
-    sev = 0
 
     for s_idx, p_idx in shared_notes:
         if s_idx in singer_map and p_idx in piano_map:
@@ -88,11 +89,12 @@ def find_out_of_sync(shared_notes, singer_map, piano_map, singer_audio, piano_au
             diff = singer_note[1] - piano_note[1]
 
             if diff > thres:
-                if diff > 3*thres:
-                    sev
+                sev = 0
+                if diff > .5:
+                    sev = 1
                 first_beat = seconds_to_beats(singer_note[1], tempo)
                 second_beat = first_beat + seconds_to_beats(diff, tempo)
-                delays.append((first_beat, second_beat))
+                delays.append((first_beat, second_beat, sev))
                 delay_path.append((singer_map[s_idx], piano_map[p_idx]))
 
     return delays, delay_path, sev
@@ -178,12 +180,39 @@ def timing_algo(sheet_music_path, audio_data_paths, bpm=110):
 
 
     delays = remove_duplicate_paths(delays)
-    print(singer_sm[0])
 
-    #plot_paths(singer_audio, piano_audio, "both", new_path)
+    plot_paths(singer_audio, piano_audio, "both", new_path)
     #plot_paths(singer_sm, singer_audio, "singer", singer_path)
     #plot_paths(piano_sm, piano_audio, "piano", piano_path)
     #plt.show()
+
+    html_plot = mpld3.fig_to_html(plt.gcf())
+    print(html_plot)
+    with open('plot.html', 'w') as file:
+        file.write(html_plot)
+
+
+
+    HOST = "127.0.0.1"  # Standard loopback interface address (localhost)
+    PORT = 65431  # Port to listen on (non-privileged ports are > 1023)
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.connect((HOST, PORT))
+        for status in delays:
+        
+            '''
+            TODO change to be based on how far out of sync
+            1 for normally out of sync 
+            0 for severly out of sync
+            
+            '''
+            s.sendall(struct.pack('!i',status[2]))
+            s.recv(1024)
+            s.sendall(struct.pack('!i', status[0]))
+            s.recv(1024)
+
+            
+            s.sendall(struct.pack('!i', status[1]))
+            s.recv(1024)
 
     return delays
 
@@ -215,6 +244,9 @@ if __name__ == "__main__":
     bpm = 110
     if(len(sys.argv) == 5):
         bpm = int(sys.argv[4])
+    demo = 0
+    if(len(sys.argv) == 6):
+        demo = int(sys.argv[5])
     
     timing_algo(sheet_music, [voice_data, piano_data], bpm)
 

@@ -1,5 +1,5 @@
 import multiprocessing
-from flask import Flask, request, redirect, send_file, url_for, make_response,jsonify
+from flask import Flask, request, redirect, send_file, url_for, make_response,jsonify, send_from_directory
 from werkzeug.utils import secure_filename
 import subprocess
 import os
@@ -13,6 +13,7 @@ from datetime import datetime
 app = Flask(__name__)
 UPLOAD_FOLDER = './upload_folder'
 RESULTS = './fresults'
+PLOTS = './plots'
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg','pdf'}
 AUDIVERIES_COMMAND = '/Users/mathiasthomas/Documents/18500/audiveris/app/build/distributions/app-5.4-alpha/bin/Audiveris'
 
@@ -217,6 +218,12 @@ def get_all_results():
         return _build_cors_preflight_response()
   
     return _corsify_actual_response(jsonify(os.listdir(RESULTS)))
+@app.route('/get_all_plots', methods=['GET', 'OPTIONS'])
+def get_all_plots():
+    if request.method == "OPTIONS": # CORS preflight
+        return _build_cors_preflight_response()
+  
+    return _corsify_actual_response(jsonify(os.listdir(PLOTS)))
 @app.route('/get_result', methods=['POST', 'OPTIONS'])
 def get_result():
     if request.method == "OPTIONS": # CORS preflight
@@ -249,6 +256,26 @@ def parse_xml(path):
      for head in heads:
         bounds = head.find('bounds').text
         print(bounds)
-        
+
+
+PLOTS_DIR = os.path.abspath('plots')
+
+@app.route('/get_plot/<plot_name>', methods=['GET', 'OPTIONS'])
+def get_plot(plot_name):
+    try:
+        # Ensure the plot file exists in the directory
+        plot_path = os.path.join(PLOTS_DIR, f'{plot_name}')
+        print(plot_path)
+
+        # Serve the HTML file directly from the directory
+
+
+        if request.method == "OPTIONS": # CORS preflight
+            return _build_cors_preflight_response()
+        return send_from_directory(PLOTS_DIR, f'{plot_name}')
+
+    except Exception as e:
+        return {'error': str(e)}, 500
+
      
     

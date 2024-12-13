@@ -4,6 +4,7 @@ import Home from './components/Home';
 import ViewResults from './components/ViewResults';
 import PlaySong from './components/PlaySong';
 import UploadPage from './components/UploadPage';
+import Plot from './components/Plot';
 
 function App() {
   return (
@@ -13,6 +14,7 @@ function App() {
         <Route path="/viewresults" element={<ViewResults />} />
         <Route path="/playsong" element={<PlaySong />} />
         <Route path="/upload" element={<UploadPage />} />
+        <Route path="/plot" element={<Plot />} />
       </Routes>
     </Router>
   );

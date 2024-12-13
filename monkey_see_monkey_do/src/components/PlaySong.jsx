@@ -62,7 +62,7 @@ function PlaySong() {
       });
 
       if (response.ok) {
-        setSubmissionMessage('Song and BPM submitted successfully!');
+        setSubmissionMessage('Now Recording!');
         console.log('Submitted:', { selectedSong, bpm });
       } else {
         throw new Error('Failed to submit song and BPM.');
@@ -73,6 +73,7 @@ function PlaySong() {
   };
 
   const handleStop = async () => {
+    setSubmissionMessage('Stopping Recording....');
     try {
       const response = await fetch('http://127.0.0.1:5000/done_song', {
         method: 'POST',
@@ -98,7 +99,7 @@ function PlaySong() {
         }
       }
 
-      setSubmissionMessage('Song stopped successfully!');
+      setSubmissionMessage('Song recording stopped successfully!');
       console.log('Song stopped, extracted images:', imageUrls);
 
       // Render the extracted images
@@ -115,7 +116,7 @@ function PlaySong() {
 
   return (
     <div style={{ textAlign: 'center', padding: '20px' }}>
-      <h1>Play Song</h1>
+      <h1>Record Song</h1>
       <div style={{ marginBottom: '20px' }}>
         <label htmlFor="songDropdown">Select a Song:</label>
         {loading ? (

@@ -15,6 +15,9 @@ function App() {
       case 3:
         navigate('/viewresults');
         break;
+      case 4:
+        navigate('/plot');
+        break;
       default:
         break;
     }
@@ -27,6 +30,7 @@ function App() {
         <button onClick={() => handleClick(1)}>Record</button>
         <button onClick={() => handleClick(2)}>Upload</button>
         <button onClick={() => handleClick(3)}>View Results</button>
+        <button onClick={() => handleClick(4)}>Plots</button>
       </div>
     </div>
   );
