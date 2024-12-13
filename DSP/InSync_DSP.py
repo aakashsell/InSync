@@ -26,6 +26,8 @@ import numpy as np # Sspecific float data type
 import aubio # Audio processing
 import pyaudio # Audio recording
 import os # Run aubio command line tools
+from os.path import join
+from threading import *
 import wave
 
 from queue import Queue
@@ -34,6 +36,7 @@ from soundfile import SoundFile
 
 import sys # Get arguments
 from Utils.util_Conversions import *
+from Utils.util_Constants import *
 
 # Index Constants for data tuple
 MIDI_INDEX = 0
@@ -74,7 +77,7 @@ def line_to_data(line:str):
         l[i] = round(float(l[i]), 4)
     return l
 
-def process_file(audio_source:str, silence_threshold:int=-55, onset_type:str="hfc"):
+def process_file(audio_source:str, silence_threshold:int=-55, suffix:str="_voice", ):
     """
         Converts a wav file given as the audio source into a data stream of tuples
         containing the detected pitch (midi value), its time of onset, and its approximate duration.
@@ -85,14 +88,15 @@ def process_file(audio_source:str, silence_threshold:int=-55, onset_type:str="hf
         Returns:
             None
     """
-    destination = "./Outputs/temp.out"
+    destination = "Outputs/temp" + suffix + ".out"
 
     source = "aubio notes " + audio_source
-    silence = " -s " + silence_threshold
-    onset = " -o " + onset_type # Change for polyphonic onsets
-    output = " > " + destination
+    silence = f" -s {silence_threshold}"
+    onset = "" #" -o " + onset_type # Change for polyphonic onsets
+    dest = " > " + destination
 
-    os.system(source + silence + onset + destination)
+    print(source + silence + onset + dest)
+    os.system(source + silence + onset + dest)
     f = open(destination,'r') #read data from destination file  
     
     unprocessed_data = []
@@ -170,14 +174,14 @@ def process_file(audio_source:str, silence_threshold:int=-55, onset_type:str="hf
     f.close()
 
     # normalize starting time
-    start_time_ofset = 0
+    start_time_opiano_streamet = 0
     if(processed_note_data[0][MIDI_INDEX] == 0):
-        start_time_ofset = processed_note_data[0][DURATION_INDEX]
+        start_time_opiano_streamet = processed_note_data[0][DURATION_INDEX]
         processed_note_data = processed_note_data[1:]
     
-    processed_data_out = open("./Outputs/modfied.out", 'w')
+    processed_data_out = open("Outputs/modfied" + suffix + ".out", 'w')
     for note in processed_note_data:
-        note[ONSET_INDEX] = note[ONSET_INDEX] - start_time_ofset
+        note[ONSET_INDEX] = note[ONSET_INDEX] - start_time_opiano_streamet
         line = data_to_line(note[MIDI_INDEX], note[ONSET_INDEX], note[DURATION_INDEX])
         processed_data_out.write(line + "\n")
         if VERBOSE_MODE:
@@ -223,6 +227,57 @@ def file_writing_thread(*, q, **soundfile_args):
                 break
             f.write(data)
 
+def record_devices(voice_id:int, piano_id:int, piece:str):
+    def create_callback(q):
+        def callback(data, frames, time, status):
+            if status:
+                print(status)
+            q.put(data.copy())
+
+        return callback
+
+    voice_queue = Queue()
+    piano_queue = Queue()
+
+    voice_stream = InputStream(
+        device=voice_id,
+        samplerate=SAMPLE_RATE,
+        channels=1,
+        callback=create_callback(voice_queue),
+    )
+    piano_stream = InputStream(
+        device=piano_id,
+        samplerate=SAMPLE_RATE,
+        channels=2,
+        callback=create_callback(piano_queue),
+    )
+
+    voice_file = SoundFile(
+        file=f"{piece}_voice.wav",
+        mode="w",
+        samplerate=int(voice_stream.samplerate),
+        channels=voice_stream.channels,
+    )
+    piano_file = SoundFile(
+        file=f"{piece}_piano.wav",
+        mode="w",
+        samplerate=int(piano_stream.samplerate),
+        channels=piano_stream.channels,
+    )
+
+    with voice_file, piano_file:
+        with voice_stream, piano_stream:
+            print("press Ctrl+C to stop the recording")
+            try:
+                while True:
+                    voice_file.write(voice_queue.get())
+                    piano_file.write(piano_queue.get())
+            except KeyboardInterrupt:
+                print("\nDone Recording")
+    
+    process_file(piece+"_piano.wav")
+    process_file(piece+"_voice.wav")
+
 def record_device(device_id:int, channels:int, piece:str):
     def audio_callback(data, frames, time, status):
         # Called for each audio block per thread
@@ -230,7 +285,7 @@ def record_device(device_id:int, channels:int, piece:str):
             print(status, file=sys.stderr)
         audio_q.put(data.copy())
 
-    file_name = join(rec_dir, f"rec_dev{piece}.wav")
+    file_name = piece + ".wav"
 
     stream = InputStream(
         samplerate=SAMPLE_RATE, 
@@ -255,10 +310,10 @@ def record_device(device_id:int, channels:int, piece:str):
         ),
     )
     thread.start()
-    if VERBOSE_MODE:
-        print(f"started thread {thread} ...")
-        print(f'recording file "{file_name}" ...')
-        print("#" * 40)
+    # if VERBOSE_MODE:
+    #     print(f"started thread {thread} ...")
+    #     print(f'recording file "{file_name}" ...')
+    #     print("#" * 40)
 
 if __name__ == "__main__":
     import argparse
@@ -298,24 +353,10 @@ if __name__ == "__main__":
             VERBOSE_MODE = True
 
     if RECORDING:
-        record_audio(NAME_OF_PIECE, device_index)
         rec_dir = join("./Recordings", NAME_OF_PIECE) # Pathname of .wav files
-
         piano_id = find_device("Scarlett 2i2")
         voice_id = find_device("Scarlett Solo")
-        
-        try:
-            record_device(device_id=piano_id, channels=2, piece=rec_dir+"_piano")
-            record_device(device_id=voice_id, channels=1, piece=rec_dir+"_voice")
-            print("press Ctrl+C to stop the recording")
-
-        except KeyboardInterrupt:
-            print("*** Ctrl-C Pressed, Ending Recording ***")
-            process_file(rec_dir+"_piano.wav")
-            process_file(rec_dir+"_voice.wav")
-        except Exception as e:
-            exit(type(e).__name__ + ": " + str(e)) 
-    
+        record_devices(voice_id, piano_id, rec_dir)
     else:
         process_file(FILENAME_TO_PROCESS)
 
