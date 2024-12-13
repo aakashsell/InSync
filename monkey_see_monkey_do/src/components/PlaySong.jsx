@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom'; // Import useNavigate for navigation
 
 function PlaySong() {
   const [songs, setSongs] = useState([]); // State for song options
@@ -7,6 +8,7 @@ function PlaySong() {
   const [loading, setLoading] = useState(false); // Loading state
   const [error, setError] = useState(null); // Error state
   const [submissionMessage, setSubmissionMessage] = useState(''); // Message after submission
+  const navigate = useNavigate(); // Initialize the navigate function
 
   // Fetch songs from an API or server
   useEffect(() => {
@@ -90,6 +92,11 @@ function PlaySong() {
     }
   };
 
+  // Handle navigation back to the home page
+  const handleBackToHome = () => {
+    navigate('/'); // Navigate back to the home page
+  };
+
   return (
     <div style={{ textAlign: 'center', padding: '20px' }}>
       <h1>Play Song</h1>
@@ -157,6 +164,24 @@ function PlaySong() {
         Stop
       </button>
       {submissionMessage && <p>{submissionMessage}</p>}
+
+      {/* Back to Home Button */}
+      <div style={{ marginTop: '20px' }}>
+        <button
+          onClick={handleBackToHome}
+          style={{
+            padding: '10px 20px',
+            backgroundColor: '#2196F3',
+            color: 'white',
+            border: 'none',
+            cursor: 'pointer',
+            borderRadius: '5px',
+            marginLeft: '10px',
+          }}
+        >
+          Back to Home
+        </button>
+      </div>
     </div>
   );
 }
