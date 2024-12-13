@@ -24,7 +24,7 @@ function App() {
     <div className="app-container">
       <h1 className="app-title">In Sync</h1>
       <div className="button-group">
-        <button onClick={() => handleClick(1)}>Play Song</button>
+        <button onClick={() => handleClick(1)}>Record</button>
         <button onClick={() => handleClick(2)}>Upload</button>
         <button onClick={() => handleClick(3)}>View Results</button>
       </div>

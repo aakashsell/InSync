@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom'; // Import useNavigate for navigation
+import { useNavigate } from 'react-router-dom';
+import JSZip from 'jszip'; // Import JSZip to handle ZIP files
 
 function PlaySong() {
   const [songs, setSongs] = useState([]); // State for song options
@@ -8,6 +9,7 @@ function PlaySong() {
   const [loading, setLoading] = useState(false); // Loading state
   const [error, setError] = useState(null); // Error state
   const [submissionMessage, setSubmissionMessage] = useState(''); // Message after submission
+  const [extractedImages, setExtractedImages] = useState([]); // State for extracted images
   const navigate = useNavigate(); // Initialize the navigate function
 
   // Fetch songs from an API or server
@@ -15,7 +17,6 @@ function PlaySong() {
     const fetchSongs = async () => {
       setLoading(true); // Start loading
       try {
-        // Simulate API call (Replace with your actual API endpoint)
         const response = await fetch('http://127.0.0.1:5000/get_all_songs');
         if (!response.ok) {
           throw new Error('Failed to fetch songs');
@@ -81,12 +82,27 @@ function PlaySong() {
         body: JSON.stringify({ song: selectedSong, bpm: parseInt(bpm, 10) })
       });
 
-      if (response.ok) {
-        setSubmissionMessage('Song stopped successfully!');
-        console.log('Song stopped');
-      } else {
+      if (!response.ok) {
         throw new Error('Failed to stop the song.');
       }
+
+      const zipBlob = await response.blob(); // Get the ZIP file as a Blob
+      const zip = await JSZip.loadAsync(zipBlob); // Load the ZIP file with JSZip
+
+      const imageUrls = [];
+      for (const filename of Object.keys(zip.files)) {
+        if (filename.endsWith('.png')) { // Process only PNG files
+          const fileBlob = await zip.file(filename).async('blob'); // Extract the file as a Blob
+          const url = URL.createObjectURL(fileBlob); // Create a URL for the Blob
+          imageUrls.push(url);
+        }
+      }
+
+      setSubmissionMessage('Song stopped successfully!');
+      console.log('Song stopped, extracted images:', imageUrls);
+
+      // Render the extracted images
+      setExtractedImages(imageUrls);
     } catch (error) {
       setSubmissionMessage('Error stopping the song: ' + error.message);
     }
@@ -164,6 +180,23 @@ function PlaySong() {
         Stop
       </button>
       {submissionMessage && <p>{submissionMessage}</p>}
+
+      {/* Render Extracted Images */}
+      {extractedImages.length > 0 && (
+        <div>
+          <h2>Extracted Images:</h2>
+          <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center' }}>
+            {extractedImages.map((url, index) => (
+              <img
+                key={index}
+                src={url}
+                alt={`Extracted ${index}`}
+                style={{ maxWidth: '200px', margin: '10px' }}
+              />
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Back to Home Button */}
       <div style={{ marginTop: '20px' }}>

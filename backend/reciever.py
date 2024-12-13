@@ -190,7 +190,16 @@ def done_song():
     os.mkdir(f"{RESULTS}/{song_name}{curr.strftime("%d%m_%Y_%H:%M:%S")}")
     for pre in prefixed:
         shutil.move(f"./{pre}",f"{RESULTS}/{song_name}{curr.strftime("%d%m_%Y_%H:%M:%S")}" )
-    return _corsify_actual_response(jsonify(os.listdir(RESULTS)))
+    files_to_zip = []
+    for file in os.listdir(f"{RESULTS}/{song_name}{curr.strftime("%d%m_%Y_%H:%M:%S")}"):
+        files_to_zip.append(os.path.join(os.path.join(RESULTS, song_name), file))
+    zip_filename = 'files.zip'
+    with zipfile.ZipFile(zip_filename, 'w', zipfile.ZIP_DEFLATED) as zipf:
+        for file_path in files_to_zip:
+            # Ensure the file exists before adding it
+            if os.path.exists(file_path):
+                zipf.write(file_path, os.path.basename(file_path))
+    return _corsify_actual_response(send_file(zip_filename,as_attachment=True, download_name='files.zip'))
 
 def _corsify_actual_response(response):
     response.headers.add("Access-Control-Allow-Origin", "*")
@@ -199,7 +208,7 @@ def _corsify_actual_response(response):
 def get_all_songs():
     if request.method == "OPTIONS": # CORS preflight
         return _build_cors_preflight_response()
-  
+    
     return _corsify_actual_response(jsonify(os.listdir(UPLOAD_FOLDER)))
 @app.route('/get_all_results', methods=['GET', 'OPTIONS'])
 def get_all_results():
