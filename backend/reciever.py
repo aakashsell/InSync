@@ -161,6 +161,7 @@ def done_song():
     music_path = ""
     sheets = []
     images = []
+    bpm = data['bpm']
     for dir_path in os.listdir(data_path):
          for dir_path2 in os.listdir(os.path.join(data_path,dir_path)):
               
@@ -181,7 +182,7 @@ def done_song():
     sheets.reverse()
     images.reverse()
     print( "path:" +music_path)          
-    p = multiprocessing.Process(target=session.create_and_handle_session, args=(sheets,music_path,images,singer_file,piano_file))
+    p = multiprocessing.Process(target=session.create_and_handle_session, args=(sheets,music_path,images,singer_file,piano_file, bpm))
     p.start()
     p.join()
     prefixed = [filename for filename in os.listdir('.') if filename.startswith("result")]

@@ -16,12 +16,12 @@ def plot_music(sheet_data, audio_data, part):
     # Plot sheet music
     for idx, (pitch, onset, duration) in enumerate(sheet_data):
         plt.plot([onset, onset + duration], [pitch, pitch], color='blue', marker='o', markersize=5, 
-                 label="Sheet Music" if idx == 0 else "")
+                 label="Singer" if idx == 0 else "")
 
     # Plot audio data
     for idx, (pitch, onset, duration) in enumerate(audio_data):
         plt.plot([onset, onset + duration], [pitch, pitch], color='red', marker='o', markersize=5, 
-                 label="Audio Data" if idx == 0 else "")
+                 label="Piano" if idx == 0 else "")
 
     plt.xlabel('Onset Time (s)')
     plt.ylabel('Pitch (MIDI Number)')
@@ -58,7 +58,6 @@ def plot_paths(sheet_data, audio_data, part, matching_paths):
 def parse_audio(file_path):
     with open(file_path, mode='r') as file:
         lines = file.readlines()
-
    
     data = []
 
@@ -125,8 +124,8 @@ def remove_duplicate_paths(path):
 
 
 # Main Algorithm
-def timing_algo(sheet_music_path, audio_data_paths, bpm =120):
-    parts_data = parse_musicxml_file(sheet_music_path, 110)
+def timing_algo(sheet_music_path, audio_data_paths, bpm=110):
+    parts_data = parse_musicxml_file(sheet_music_path, bpm)
     tempo = parts_data[1]
 
     # Extract and format sheet music data
@@ -179,13 +178,12 @@ def timing_algo(sheet_music_path, audio_data_paths, bpm =120):
 
 
     delays = remove_duplicate_paths(delays)
-
-    print(singer_sm)
+    print(singer_sm[0])
 
     #plot_paths(singer_audio, piano_audio, "both", new_path)
-    plot_paths(singer_sm, singer_audio, "singer", singer_path)
+    #plot_paths(singer_sm, singer_audio, "singer", singer_path)
     #plot_paths(piano_sm, piano_audio, "piano", piano_path)
-    plt.show()
+    #plt.show()
 
     return delays
 
@@ -214,7 +212,9 @@ if __name__ == "__main__":
     sheet_music = sys.argv[1]
     voice_data = sys.argv[2]
     piano_data = sys.argv[3]
-    bpm = sys.argv[3]
+    bpm = 110
+    if(len(sys.argv) == 5):
+        bpm = int(sys.argv[4])
     
     timing_algo(sheet_music, [voice_data, piano_data], bpm)
 

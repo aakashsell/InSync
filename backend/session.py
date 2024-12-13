@@ -12,12 +12,12 @@ class Info:
 HOST = "127.0.0.1"  # Standard loopback interface address (localhost)
 PORT = 65432  # Port to listen on (non-privileged ports are > 1023)
 
-def create_and_handle_session(sheet_path, music_xml_path,image_path, voice_path, piano_path):
+def create_and_handle_session(sheet_path, music_xml_path,image_path, voice_path, piano_path, bpm):
     
     manager = MusicManager(sheet_path,music_xml_path,image_path)
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         
-        process = subprocess.Popen(["python3", "../TimingAlgo/timing_algo.py", os.getcwd() + "/"+ music_xml_path,voice_path,piano_path] )
+        process = subprocess.Popen(["python3", "../TimingAlgo/timing_algo.py", os.getcwd() + "/"+ music_xml_path,voice_path,piano_path,str(bpm)] )
         print("Starting Socket")
         s.bind((HOST, PORT))
         s.listen()
