@@ -274,9 +274,11 @@ def record_devices(voice_id:int, piano_id:int, piece:str):
                     piano_file.write(piano_queue.get())
             except KeyboardInterrupt:
                 print("\nDone Recording")
-    
-    process_file(piece+"_piano.wav")
-    process_file(piece+"_voice.wav")
+    piano_file_name = piece + "_piano.wav"
+    voice_file_name = piece + "_voice.wav"
+
+    process_file(audio_source=piano_file ,suffix="_piano")
+    process_file(audio_source=voice_file_name, suffix="_voice")
 
 def record_device(device_id:int, channels:int, piece:str):
     def audio_callback(data, frames, time, status):
